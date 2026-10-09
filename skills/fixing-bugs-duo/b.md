@@ -23,6 +23,7 @@
 ## 边界
 
 - 只在分支 `fix/<短名>` 上工作，不 checkout 别的分支。
+- commit 时按路径 `git add`，不用 `git add -A` 或 `git add .`。跑复现或测试时自动生成、项目又没忽略的缓存和编译产物（例如 `__pycache__/`），不提交，也不算打点。下文说 `git status --short` 为空，都是指除了这些生成物以外为空。
 - 不用 `git stash`：stash 栈由全部 worktree 共享。
 - 已 commit 的历史不改写：不 amend、不 rebase、不 reset、不 force push。A 的审查钉在这些 sha 上。
 - 提交身份：worktree 里 `git config user.email` 有值，就用仓库配置。没有值，就用 `handover.md` 的「提交身份」，每条 commit 命令加 `-c user.name=<名字> -c user.email=<邮箱>`。两处都没有，回复 `STATUS: PAUSED 没有 git 身份`。不改 git 配置，也不自己编身份。
@@ -78,6 +79,7 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 4. commit，带 trailer，同时更新 `progress.md`。commit 要小：子步骤做完就提交，中间态用 `Flow: wip`。
 5. 日志只写进 duo 目录的 `logs/`，不写别处。运行日志很长时，交给子 agent 判读。结论要带证据，写路径加行号或 commit sha。
 6. 预计超过 2 分钟、你要停下等的事（长命令、等子 agent 交回），先在 duo 目录写 `running`。它只有一行：`<预计分钟> <在做什么>`。做完立即删掉。A 的监视脚本靠它区分「在跑长命令」和「卡住」；没有它，10 分钟没动静就会被判为卡住。
+7. 预计超过 2 分钟的命令放到后台跑，输出写进 `logs/`，再等它结束。Cursor：Shell 设 `block_until_ms: 0`，再用 AwaitShell 等。A 误判卡住、interrupt 你时，前台命令会被取消，后台命令照常跑完。
 
 **Flow trailer**，写在 commit message 末尾，项目自己的格式照旧：
 
@@ -123,13 +125,14 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 
 ## A 的消息
 
-A 只在三种情况下 resume 你：
+A 只在四种情况下 resume 你：
 1. P0：
    1. 先运行 `git status --short`。有没提交的半步改动时，先把它 commit 成 `Flow: wip`，message 里写「被 P0 打断，未完成」。测试没过也照样提交。
    2. 再修 P0，单独 commit，带 `Flow: fix <发现编号>`。
    3. 修完接着原来的步骤做。
 2. 用户确认的流程指令，例如方案升版。按指令做。方案升版时，只重做 `rulings.md` 里写明受影响的步骤。
 3. BLOCKING 答复通知：读 `rulings.md`，继续。
+4. 判你卡住时重发的最后一条指令：按 `progress.md` 和 `git log` 的现状接着做。在等后台长命令时，补写 `running`，接着等同一个 shell。
 
 ## 收尾
 

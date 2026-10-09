@@ -11,7 +11,7 @@ license: MIT
 
 按需读：建 flow 文件时读 [files.md](files.md)；开了 B 之后读 [supervise.md](supervise.md)，里面是监督、终审和交付；审查时读 [review.md](review.md)。
 
-简单问题不开 B：快修档、以及诊断后估算不超过 2 步且没命中硬条件的问题，A 单会话修完。
+简单问题不开 B：快修档，以及第 4 步判为豁免的问题，A 单会话修完。
 
 ## 依赖
 
@@ -37,10 +37,12 @@ license: MIT
 
 duo 目录不在工作区里，`git status` 看不到它，也不用改 `info/exclude`；`git worktree remove` 时它会一起删掉。
 
+**运行生成物**：跑复现或测试时自动生成、项目又没有忽略的缓存和编译产物，例如 `__pycache__/`、`bin/`、`obj/`。worktree 从 HEAD 新建，所以里面的未跟踪文件只可能是 A 或 B 造出来的。运行生成物不算打点，不提交，也不让 worktree 变脏。下文说 `git status --short` 为空，都是指除了运行生成物以外为空。
+
 任务 worktree **分时独占**：
 - A 诊断期间由 A 独占。A 的打点从不 commit，交给 B 前清理到 `git status --short` 为空。
 - B 在跑时由 B 独占，A 只读。A 读 git 一律加 `--no-optional-locks`，审查钉在 commit sha 上，不读 B 的工作区。
-- B 结束本轮、A 还没 resume 它时，A 可以在 worktree 里运行命令。A 不改跟踪文件，不 commit，不 checkout，跑完后 `git status --short` 和 B 交回时一致。
+- B 结束本轮、A 还没 resume 它时，A 可以在 worktree 里运行命令。A 不改跟踪文件，不 commit，不 checkout，跑完后 `git status --short` 和 B 交回时一致。A 的 shell 跑完就切回 flow 仓库：Windows 上，shell 的工作目录停在 worktree 里，第 9 步就删不掉它。
 - B 在跑而 A 要亲手做实验时，A 用 `git worktree add --detach <临时路径> <sha>` 开临时 worktree，用完即删。
 
 A 和 B 都不用 `git stash`：stash 栈由同一仓库的全部 worktree 共享。
@@ -81,22 +83,24 @@ A 先自己判断，拿不准才问用户：
 
 ## 4. 分流
 
-按根因估算执行顺序，不含 S0 准备步骤：
+按根因估算执行顺序，不含 S0 准备步骤。再按诊断时实际跑过的耗时，估一轮「原始复现加相关测试」要多久，下表简称「一轮耗时」：
 
 | 情况 | 做法 |
 |---|---|
-| ≤2 步，且没命中硬条件 | **豁免**：A 不开 B，自己在任务 worktree 里按 `fixing-bugs` 修完。没有风险信号时接排查档第 3 步；有风险信号时接 `full.md` 第 3 段，文档放 flow 的 `<短名>/`。按「停下与交付」收尾后，A 用记下的提交身份 commit、push，向目标分支建 Draft MR/PR，按下文「交付报告」报告，写明为什么没开 B，再做第 9 步。 |
-| 3–8 步，且没命中硬条件 | **轻量版**：只在最后一步标 `[M]`，只在最后一步的完成 commit 上做一次全量审查 |
+| 没命中硬条件，并且满足其一：≤2 步；≤4 步且一轮耗时不超过 5 分钟 | **豁免**：A 不开 B，自己在任务 worktree 里按 `fixing-bugs` 修完。没有风险信号时接排查档第 3 步；有风险信号时接 `full.md` 第 3 段，文档放 flow 的 `<短名>/`。3–4 步的豁免，交付前按 [review.md](review.md) 的轻量版派 1 个审查 agent 看维度 1、2；没有 flow 文档时，给它的文档片段换成根因、修好标准和回归测试的期望。按「停下与交付」收尾后，A 用记下的提交身份 commit、push，向目标分支建 Draft MR/PR，按下文「交付报告」报告，写明为什么没开 B，再做第 9 步。 |
+| 其余没命中硬条件、≤8 步的 | **轻量版**：只在最后一步标 `[M]`，只在最后一步的完成 commit 上做一次全量审查 |
 | >8 步，或命中硬条件 | **全流程**：`[M]` 按 [files.md](files.md) 的规则标，每个 `[M]` 做一次全量审查；历史翻车型判据各写一条锚定断言 |
+
+开 B 有固定开销：写 7 个以上 flow 文件、起监视脚本、每步审查。步数少、测试又快时，A 自己修更快。B 划算的是测试慢、步骤多，或有活能并行的 bug。
 
 轻量版和全流程都锚定第一条正式回归测试（锚定断言 A-1）。
 
 有事要问用户时（硬条件拿不准、目标分支待用户、缺提交身份），按分流结果定时机：
-- ≤2 步：现在一次问齐，等回答再分流或交付。
-- 3–8 步：先按轻量版往下做，问题并进第 6 步的确认提问；答案命中硬条件就改成全流程。
+- 豁免：现在一次问齐，等回答再分流或交付。
+- 轻量版：先按轻量版往下做，问题并进第 6 步的确认提问；答案命中硬条件就改成全流程。
 - >8 步：直接走全流程，问题并进第 6 步的确认提问。
 
-**完成：** 对话里有估算步数、硬条件结论、分流结果和理由；豁免时已转去单会话修复。
+**完成：** 对话里有估算步数、一轮耗时、硬条件结论、分流结果和理由；豁免时已转去单会话修复。
 
 ## 5. 先开 B 做准备
 
@@ -114,7 +118,7 @@ A 先自己判断，拿不准才问用户：
 ```
 
 4. 把 B 的 agent ID 写进 `handover.md`，并在对话里告诉用户（带链接）。
-5. 在后台起监视脚本，工作目录设为 flow 仓库，用宿主的输出通知唤醒 A。Cursor 用 Shell 的 `notify_on_output`，匹配 `^DUO_WAKE_<短名>`。B 的转录路径在开 B 时由宿主返回，一并传进去：
+5. 在后台起监视脚本，工作目录设为 flow 仓库，用宿主的输出通知唤醒 A。Cursor 用 Shell 的 `notify_on_output`，匹配 `^DUO_(WAKE|ERROR)_<短名>`。B 的转录路径在开 B 时由宿主返回，一并传进去：
    - Windows：`powershell -NoProfile -ExecutionPolicy Bypass -File <本 skill 目录>/scripts/watch.ps1 -Worktree <路径> -Tag <短名> -Transcript <B 的转录>`
    - 其他：`bash <本 skill 目录>/scripts/watch.sh <路径> <短名> <B 的转录>`
 
@@ -125,7 +129,9 @@ A 先自己判断，拿不准才问用户：
    - `heartbeat`：B 在干活期间，20 分钟没有任何事件。B 本轮结束后不发。
    - `status`：`progress.md` 的 `STATUS:` 行变了。只在加了 `-WatchStatus`（`watch.sh` 用环境变量 `DUO_WATCH_STATUS=1`）时才有，供下面的退路用。
 
-   把 `DUO_READY` 行里的 pid 写进 `handover.md`，停脚本时用它：`Stop-Process -Id <pid>` 或 `kill <pid>`。宿主报的 PID 可能是外层 shell，停掉它，脚本还会在。worktree 删掉后，脚本打一行 `DUO_EXIT_<短名>` 自己退出。换 B 时，用新的转录路径重启脚本。
+   起脚本后，先等到 `DUO_READY` 行再往下做（Cursor：AwaitShell 匹配 `^DUO_(READY|ERROR)_<短名>`）。等到的是 `DUO_ERROR_` 行时，按它写的原因修好再起。把 `DUO_READY` 行里的 pid 写进 `handover.md`，停脚本时用它：`Stop-Process -Id <pid>` 或 `kill <pid>`。宿主报的 PID 可能是外层 shell，停掉它，脚本还会在。
+
+   脚本中途出错，会打一行 `DUO_ERROR_<短名> <原因>` 后退出，A 会被唤醒。宿主报告脚本的 shell 退出、又不是 A 停的时，A 重启脚本并更新 pid。worktree 删掉后，脚本打一行 `DUO_EXIT_<短名>` 自己退出，这一行不唤醒 A。换 B 时，用新的转录路径重启脚本。
 
 **退路：两个独立聊天。** 宿主没有后台子 agent，或不能给运行中的子 agent 发消息时：
 1. A 把上面的提示词写进 flow 的 `<短名>/b-prompt.md`，请用户新开一个聊天粘贴。
@@ -166,7 +172,9 @@ B 跑 S0 期间，A 在 flow 的 `<短名>/` 里写交接材料：
    - 门槛判例：估算步数、实际步数、档位
 2. 在 flow 仓库建 `archive/` 目录（已有就跳过），执行 `git mv <短名> archive/<短名>`，然后 commit。`archive/` 不存在时 `git mv` 会失败。
 3. 监视脚本还在跑，就按 `handover.md` 里的 pid 停掉。
-4. 清理现场。删 worktree 前，A 的 shell 先切出 worktree，从那里启动的后台进程也要停掉。Windows 上，只要还有进程的工作目录在 worktree 里，删除就会失败。这时 git 已注销这个 worktree，只剩一个空目录，切出、停掉这些进程后再删。
+4. 清理现场。删 worktree 前：
+   - 运行 `git -C <worktree> status --short`。只剩运行生成物时，下面的 `worktree remove` 加 `--force`，否则 git 会因为未跟踪文件拒绝删除。还有别的改动或未跟踪文件时，先弄清是谁写的、要不要留，不加 `--force`。
+   - A 的 shell 先切出 worktree，从那里启动的后台进程也要停掉。Windows 上，只要还有进程的工作目录在 worktree 里，删除就会失败。这时 git 已注销这个 worktree，只剩目录，切出、停掉这些进程后再删目录。
    - 已合入：`git -C <主仓库> worktree remove <worktree>`，duo 目录随之删掉；再 `git -C <主仓库> branch -d fix/<短名>`。远端分支按平台设置处理，多数平台合入时会自动删除。
    - 放弃：同样删掉 worktree，本地分支用 `branch -D` 删。远端分支删不删、Draft MR/PR 关不关，在同一条消息里问用户，默认保留。
    - 用户要求保留现场时，在 `handover.md` 写明原因。

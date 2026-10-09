@@ -8,6 +8,12 @@ param(
     [int]$StallMinutes = 10
 )
 
+# A is woken only by lines it matches, so a crash must say so on stdout.
+trap {
+    Write-Output "DUO_ERROR_$Tag $($_.Exception.Message)"
+    exit 1
+}
+
 $gitDir = git --no-optional-locks -C $Worktree rev-parse --absolute-git-dir 2>$null
 if ($LASTEXITCODE -ne 0 -or -not $gitDir) {
     Write-Output "DUO_ERROR_$Tag not a git worktree: $Worktree"
