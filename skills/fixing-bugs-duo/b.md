@@ -10,19 +10,27 @@
 - 第一次写正式测试前：读 `fixing-bugs` 目录 `full.md` 的第 5–6 段，以及它依赖的 `tdd`。
 - 用到锚定断言时：读 `anchored/` 里对应的文件。
 
-flow 目录只读。你只写任务 worktree，包括它根目录下的 `progress.md`。
+你只写两处：任务 worktree 的跟踪文件，和 duo 目录（`progress.md`、`logs/`、`running`）。flow 目录只读。
+
+## 和 full.md 不一样的地方
+
+`full.md` 是给单会话写的。下面几处按本文件做：
+1. 第 5 段要求先确认方案和 seam 已获用户确认：`handover.md` 的方案版本是 `<短名>-v<k>`，就算已确认。
+2. 第 5 段要求每次运行后更新测试计划的状态和证据：写进 `progress.md` 的「用例记录」，不写 `test-plan.md`。A 审查时会转抄过去。
+3. 第 6 段只做第 1–3 步：清理、重跑原始复现、重跑必做用例，结果写进「用例记录」。第 4 步的审查、报告和交付，换成本文件的「收尾」。
+4. `fixing-bugs`「停下与交付」第 4 条说「改动默认留在工作区」，对你不适用：你每步都 commit。一次性 harness 在 flow 的 `repro/` 里，不归你删。
 
 ## 边界
 
 - 只在分支 `fix/<短名>` 上工作，不 checkout 别的分支。
 - 不用 `git stash`：stash 栈由全部 worktree 共享。
 - 已 commit 的历史不改写：不 amend、不 rebase、不 reset、不 force push。A 的审查钉在这些 sha 上。
-- commit 用仓库现有的 git 身份，不改 git 配置。仓库没有配置身份时，回复 `STATUS: PAUSED 没有 git 身份`。
+- 提交身份：worktree 里 `git config user.email` 有值，就用仓库配置。没有值，就用 `handover.md` 的「提交身份」，每条 commit 命令加 `-c user.name=<名字> -c user.email=<邮箱>`。两处都没有，回复 `STATUS: PAUSED 没有 git 身份`。不改 git 配置，也不自己编身份。
 - `rulings.md` 里已经裁决的事项不推翻。遇到歧义，先查 `rulings.md` 的预埋区，查不到再按下文「裁决请求」写 R-n。
 
 ## 每次结束本轮
 
-你每次结束本轮，回复的第一行都必须是 `STATUS:` 行，A 靠它决定下一步。即使是中途停下也一样：
+你每次结束本轮，回复的第一行都必须是 `STATUS:` 行，A 靠它决定下一步。即使是中途停下也一样。结束前，把同一行写进 `progress.md` 的 `STATUS:` 行，覆盖旧值。
 
 | 状态 | 什么时候用 |
 |---|---|
@@ -38,8 +46,12 @@ flow 目录只读。你只写任务 worktree，包括它根目录下的 `progres
 
 ## 冷启动
 
-`progress.md` 已经存在时，说明你是接手的 B，或者刚从压缩中恢复：
-1. 在 `progress.md` 的压缩日志里追加一行 `compaction: <时间>`，这是第一个动作。新开的 B 写 `takeover: <时间>`。
+下面两种情况算冷启动：
+- 你是新开的 B，但 duo 目录里已经有 `progress.md`：你是接手的 B。
+- 你的上下文从一段压缩摘要开始：你刚从压缩中恢复。
+
+A resume 你、上下文还完整时，不算冷启动。冷启动时：
+1. 在 `progress.md` 的压缩日志里追加一行，这是第一个动作。接手写 `takeover: <时间>`，压缩恢复写 `compaction: <时间>`。
 2. 读 `progress.md` 和 `git log --oneline -20`。
 3. 从「当前步骤」接着做。
 
@@ -47,24 +59,25 @@ flow 目录只读。你只写任务 worktree，包括它根目录下的 `progres
 
 方案冻结前，A 只让你做 S0：
 1. 确认 `git status --short` 为空，当前分支正确。
-2. 按本文件末尾的格式建 `progress.md`。
-3. 确认依赖已装好。A 在后台装，没装完就等它装完。
+2. 按本文件末尾的格式，在 duo 目录建 `progress.md`。
+3. 确认依赖已装好。A 在后台装，输出在 `logs/deps.txt`；没装完就等它装完。
 4. 运行 flow 目录 `repro/` 里的原始复现命令，确认它像 `handover.md` 写的那样失败，把输出摘要记进 `progress.md`。
 5. 运行 `steps.md` 中 S0 列出的相关测试套件。修复前就失败的用例记进 `progress.md` 的「基线失败」。
 6. S0 不改跟踪文件，也不 commit。结束本轮，回复 `STATUS: S0-DONE`，附复现输出摘要和基线失败清单。
 
 ## 每一步
 
-1. 按 `steps.md` 和 `full.md` 第 5 段做，一次只做一条用例。证明行为改变的用例，先 `red` 再 `green`；验证既有行为的用例可以直接 `green`。
+1. 按 `steps.md` 和 `full.md` 第 5 段做，一次只做一条用例。证明行为改变的用例，先 `red` 再 `green`；验证既有行为的用例可以直接 `green`。每次运行后，在「用例记录」里更新这条用例的状态、命令、输出摘要和日志文件。
 2. 第一条正式回归测试就是锚定断言 A-1：
    - 把 `anchored/A-1.*` 的文本拷进测试代码，块首写 `ANCHORED id=A-1 begin`，块尾写 `ANCHORED id=A-1 end`，用该语言的注释语法。
    - 带 `CORE` 注释的核心行逐字保留，`CORE` 注释也保留。
    - 核心行以外的改动是机械适配，可以自己做，例如 import、夹具名、语法、缩进。commit trailer 加 `Flow: anchored-adapt A-1`。
    - 改任何核心行都是方向变更，必须先写 BLOCKING 的 R-n，等 A 批准。
    - 先运行它，确认它因为预期的根因失败；再写刚好让它通过的修复。
-3. 每个步骤完成 commit 之前做**定点读**：读 `rulings.md` 和 `batch.md` 里游标之后的新条目，处理适用的条目，更新 `progress.md` 的已读游标。
+3. 每个步骤完成 commit 之前做**定点读**：读 `rulings.md` 和 `batch.md` 里游标之后的新条目，处理适用的条目，更新 `progress.md` 的已读游标。同时确认这一步的用例已经写进「用例记录」：A 被这个 commit 唤醒后，要靠它轻检和转抄。
 4. commit，带 trailer，同时更新 `progress.md`。commit 要小：子步骤做完就提交，中间态用 `Flow: wip`。
-5. 运行日志很长时，输出写进文件或交给子 agent 判读。结论要带证据，写路径加行号或 commit sha。
+5. 日志只写进 duo 目录的 `logs/`，不写别处。运行日志很长时，交给子 agent 判读。结论要带证据，写路径加行号或 commit sha。
+6. 预计超过 2 分钟、你要停下等的事（长命令、等子 agent 交回），先在 duo 目录写 `running`。它只有一行：`<预计分钟> <在做什么>`。做完立即删掉。A 的监视脚本靠它区分「在跑长命令」和「卡住」；没有它，10 分钟没动静就会被判为卡住。
 
 **Flow trailer**，写在 commit message 末尾，项目自己的格式照旧：
 
@@ -78,7 +91,7 @@ flow 目录只读。你只写任务 worktree，包括它根目录下的 `progres
 
 ## 外包
 
-能并行的活交给子 agent，不能并行的你自己串行做：
+宿主能让你开子 agent 时（Cursor 可以），能并行的活交给子 agent，不能并行的你自己串行做：
 
 | 外包 | 自己做 |
 |---|---|
@@ -89,7 +102,7 @@ flow 目录只读。你只写任务 worktree，包括它根目录下的 `progres
 - 每个子 agent 只拿它的用例行、它负责的文件路径和运行命令，交回结果和证据。
 - 同一个文件不让两个 agent 同时改。
 - 子 agent 的结果由你核对后统一 commit。
-- 子 agent 在跑时，你继续做自己那条线。
+- 子 agent 在跑时，你继续做自己那条线。要停下等它时，按「每一步」第 6 条写 `running`。
 
 ## 裁决请求
 
@@ -111,7 +124,10 @@ flow 目录只读。你只写任务 worktree，包括它根目录下的 `progres
 ## A 的消息
 
 A 只在三种情况下 resume 你：
-1. P0：先修它，commit 带 `Flow: fix <发现编号>`，修完再接着原来的步骤做。
+1. P0：
+   1. 先运行 `git status --short`。有没提交的半步改动时，先把它 commit 成 `Flow: wip`，message 里写「被 P0 打断，未完成」。测试没过也照样提交。
+   2. 再修 P0，单独 commit，带 `Flow: fix <发现编号>`。
+   3. 修完接着原来的步骤做。
 2. 用户确认的流程指令，例如方案升版。按指令做。方案升版时，只重做 `rulings.md` 里写明受影响的步骤。
 3. BLOCKING 答复通知：读 `rulings.md`，继续。
 
@@ -129,14 +145,14 @@ DoD 达成后：
 ```text
 STATUS: DOD
 final_sha: <sha>
-必做用例：<n>/<n> green（证据：<路径或输出文件>）
+必做用例：<n>/<n> green（证据：「用例记录」和 logs/ 里的文件）
 原始复现：通过（<输出摘要>）
 基线失败：<与 S0 相比有无变化>
 ```
 
 A 验收通过后，会用「交付」resume 你：
 1. push 分支。
-2. 按项目规范建 Draft MR/PR。描述里写根因、改法、验证、`batch.md` 里的 P1/P2、待拍板项、方案版本。分支上保留 `Flow:` trailer。
+2. 向 `handover.md` 里的目标分支建 Draft MR/PR，按项目规范写。描述里写根因、改法、验证、`batch.md` 里的 P1/P2、待拍板项、方案版本。分支上保留 `Flow:` trailer。
 3. 回复 `STATUS: DELIVERED <链接>`。
 
 注意：不合入，也不做等同于批准合入的动作，例如标记 ready、指派会自动合入的审查者。
@@ -145,18 +161,29 @@ push 或建 MR/PR 做不了时，把描述草稿写进 `progress.md`，回复 `S
 
 MR/PR 的评审意见由 A 转给你，按 `Flow: fix` 处理。
 
-**两个独立聊天的退路**：你是用户手动开的聊天、不是 A 的子 agent 时，「结束本轮」改为停下并告诉用户 `STATUS:` 行。P0 会出现在 `batch.md` 里，由定点读读到。BLOCKING 请求等 30 分钟没有答复时，直接问用户。
+## 两个独立聊天的退路
+
+你是用户手动开的聊天、不是 A 的子 agent 时：
+- 「结束本轮」改为：写好 `progress.md` 的 `STATUS:` 行，停下，并把这一行告诉用户。A 的监视脚本会看到它。
+- A 的指令写在 `handover.md` 的「给 B 的指令」里，编号 `I-<n>`。每次开始干活、每次定点读，都读一遍新的 I-n，在 `progress.md` 的已读游标里记到哪一条。
+- BLOCKING 请求等 30 分钟没有答复时，直接问用户。
 
 ## `progress.md` 格式
 
 ```markdown
 # progress <短名>
 
+<第一次结束本轮时，把这一行换成 STATUS: 行；之后每次结束都覆盖它>
+
 - 当前步骤：
 - 本批改动文件：
 - 下一步：
 - 未决项：
-- 已读游标：rulings.md 到 <最后读到的标题>；batch.md 到 <最后读到的编号>
+- 已读游标：rulings.md 到 <最后读到的标题>；batch.md 到 <最后读到的编号>；handover 指令到 <I-n，只在退路里用>
+
+## 用例记录
+| 用例 | 状态 | 命令 | 输出摘要 | 日志 | commit |
+|---|---|---|---|---|---|
 
 ## 基线失败（S0）
 
