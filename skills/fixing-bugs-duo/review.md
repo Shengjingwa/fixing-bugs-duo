@@ -21,7 +21,7 @@
 
 | commit | 做法 |
 |---|---|
-| `Flow: step`，该步是 `[M]` | 全量审查本周期的 commit 区间（上一个 `[M]` 之后到这个 commit）。最后一个 `[M]` 审整个任务区间，兼作终审 |
+| `Flow: step`，该步是 `[M]` | 全量审查本周期的 commit 区间（上一个 `[M]` 之后到这个 commit）。最后一个 `[M]` 审整个任务区间，兼作终审。验证步没有 commit 时，B 直接回 `STATUS: DOD`，A 审到 `HEAD` |
 | `Flow: step`，不是 `[M]` | A 亲自轻检：读 diff，扫 P0 形态，核对该步完成判据。这一步碰了关键路径时，还要核对第 8 维用例都绿。B 的 `progress.md`「用例记录」可能比 commit 晚一两分钟写好，没写时先审 diff，用例记录留到下次醒来再核 |
 | `Flow: wip` | 不审，快照时看有没有明显异常 |
 | 单独的 `Flow: anchored-adapt` | 下次醒来时轻检：逐块比对 `CORE` 行和 `anchored/` 原文 |
@@ -55,7 +55,7 @@
 | 1. 方案符合性 | 只实施了选定方案；没碰禁区；根因被消除或隔离，不是遮住症状 | `problem-and-solutions.md` 的选定方案、根因、禁区 |
 | 2. 断言方向抽样 | 抽 K 条断言，K = min(10, 本周期新增和修改的断言数)，必抽下面两类，其余随机补足。核对每条断言测的是方案和测试计划的要求，而不是代码现状 | `test-plan.md` 的对应用例行；`anchored/` 原文；`rulings.md` 的锚定登记 |
 | 3. 相邻功能（A 自查） | `test-plan.md` 第 8 维的用例都在，`progress.md`「用例记录」里都是 green；必要时在 B 停着时亲手跑一遍 | `test-plan.md` 第 8 维 |
-| 4. 清洁与攒批（A 自查） | 生产路径没有诊断前缀（`git grep` 搜）；`git diff --stat` 里没有与 bug 无关的文件；`git log --format=%B` 里 trailer 齐全；`batch.md` 里该本周期修的条目已修 | `batch.md`；诊断前缀 |
+| 4. 清洁与攒批（A 自查） | 生产路径没有诊断前缀（`git grep` 搜）；`git diff --stat` 里没有与 bug 无关的文件；`git diff --check <起点>..HEAD` 无输出（有输出记 P2）；`git log --format=%B` 里 trailer 齐全；`batch.md` 里该本周期修的条目已修 | `batch.md`；诊断前缀 |
 
 维度 2 必抽的两类：
 - 同一个 commit 里，既改了被测实现，又改了对应断言的期望值。这是假绿的典型形态。

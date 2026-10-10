@@ -77,7 +77,7 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
    - 改任何核心行都是方向变更，必须先写 BLOCKING 的 R-n，等 A 批准。
    - 先运行它，确认它因为预期的根因失败；再写刚好让它通过的修复。
 3. 每个步骤完成 commit 之前做**定点读**：读 `rulings.md` 和 `batch.md` 里游标之后的新条目，处理适用的条目，更新 `progress.md` 的已读游标。同时确认这一步的用例已经写进「用例记录」：A 被这个 commit 唤醒后，要靠它轻检。
-4. commit，带 trailer，同时更新 `progress.md`。commit 要小：子步骤做完就提交，中间态用 `Flow: wip`。
+4. commit 前跑 `git diff --check`，有多余空行或行尾空格就先清掉；commit 带 trailer，同时更新 `progress.md`。commit 要小：子步骤做完就提交，中间态用 `Flow: wip`。
 5. 日志只写进 duo 目录的 `logs/`，不写别处。运行日志先用 `rg -n "FAIL|Error|Traceback" <日志>` 定位；命中太多或看不懂，再按「外包」交给子 agent。结论要带证据，写路径加行号或 commit sha。你自己加的诊断输出一律带前缀 `[DEBUG-duo]`，最后一步 commit 前用它搜一遍，删干净。
 6. 预计超过 2 分钟、你要停下等的事（长命令、等子 agent 交回），或预计连续只读超过 5 分钟（例如通读调用方代码），先在 duo 目录写 `running`。它只有一行：`<预计分钟> <在做什么>`。做完立即删掉。A 的监视脚本靠它区分「在跑长命令」和「卡住」；没有它，10 分钟没动静就会被判为卡住。
 7. 预计超过 2 分钟的命令放到后台跑，输出写进 `logs/`，再等它结束。Cursor：Shell 设 `block_until_ms: 0`，再用 AwaitShell 等。A 误判卡住、interrupt 你时，前台命令会被取消，后台命令照常跑完。
