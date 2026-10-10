@@ -53,7 +53,7 @@ status_of() {
 }
 
 transcript_len() {
-  if [ -n "$transcript" ] && [ -f "$transcript" ]; then wc -c < "$transcript" | tr -d ' '; else echo -1; fi
+  if [ "$t" != -1 ] && [ -f "$transcript" ]; then wc -c < "$transcript" | tr -d ' '; else echo -1; fi
 }
 
 transcript_idle() {
@@ -140,21 +140,25 @@ while true; do
   t=$(transcript_len)
   if [ "$t" != -1 ]; then
     transcript_idle && idle=1
-    if [ "$t" != "$tlen" ] || other_activity "$now"; then
+    # other_activity looks back stall_min minutes, so when it fails the silence
+    # already lasted that long; active_at only tracks the transcript.
+    if [ "$t" != "$tlen" ]; then
       tlen=$t
       active_at=$now
       stall_reported=0
+    fi
+    if other_activity "$now"; then
+      stall_reported=0
     elif [ "$idle" = 0 ] && [ "$stall_reported" = 0 ] && [ $((now - active_at)) -ge $((stall_min * 60)) ]; then
-      if worktree_edits; then
-        active_at=$now
-      else
+      if ! worktree_edits; then
         stall_reported=1
         wake stall
       fi
     fi
   fi
 
-  if [ "$idle" = 1 ]; then
+  # With a transcript, silence is already reported as stall; heartbeat is only for runs without one.
+  if [ "$idle" = 1 ] || [ "$t" != -1 ]; then
     last=$now
   elif [ $((now - last)) -ge $((beat_min * 60)) ]; then
     wake heartbeat

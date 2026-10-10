@@ -26,7 +26,7 @@
 - commit 时按路径 `git add`，不用 `git add -A` 或 `git add .`。跑复现或测试时自动生成、项目又没忽略的缓存和编译产物（例如 `__pycache__/`），不提交，也不算打点。下文说 `git status --short` 为空，都是指除了这些生成物以外为空。
 - 不用 `git stash`：stash 栈由全部 worktree 共享。
 - 已 commit 的历史不改写：不 amend、不 rebase、不 reset、不 force push。A 的审查钉在这些 sha 上。
-- 提交身份：worktree 里 `git config user.email` 有值，就用仓库配置。没有值，就用 `handover.md` 的「提交身份」，每条 commit 命令加 `-c user.name=<名字> -c user.email=<邮箱>`。两处都没有，回复 `STATUS: PAUSED 没有 git 身份`。不改 git 配置，也不自己编身份。
+- 提交身份：worktree 里 `git config user.name` 和 `git config user.email` 都有值，就用仓库配置。缺任何一个，就用 `handover.md` 的「提交身份」，每条 commit 命令加 `-c user.name=<名字> -c user.email=<邮箱>`。两处都没有，回复 `STATUS: PAUSED 没有 git 身份`。不改 git 配置，也不自己编身份。
 - `rulings.md` 里已经裁决的事项不推翻。遇到歧义，先查 `rulings.md` 的预埋区，查不到再按下文「裁决请求」写 R-n。
 
 ## 每次结束本轮
@@ -61,24 +61,25 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 方案冻结前，A 只让你做 S0：
 1. 确认 `git status --short` 为空，当前分支正确。
 2. 按本文件末尾的格式，在 duo 目录建 `progress.md`。
-3. 确认依赖已装好。A 在后台装，输出在 `logs/deps.txt`；没装完就等它装完。
+3. 按 `handover.md` 的「依赖」确认依赖已装好。写的是「后台安装中」时，等 `logs/deps.txt` 末行出现 `DEPS_DONE` 再往下做。
 4. 运行 flow 目录 `repro/` 里的原始复现命令，确认它像 `handover.md` 写的那样失败，把输出摘要记进 `progress.md`。
 5. 运行 `steps.md` 中 S0 列出的相关测试套件。修复前就失败的用例记进 `progress.md` 的「基线失败」。
-6. S0 不改跟踪文件，也不 commit。结束本轮，回复 `STATUS: S0-DONE`，附复现输出摘要和基线失败清单。
+6. S0 不改跟踪文件，也不 commit。第 4、5 步预计超过 2 分钟时，按「每一步」第 6、7 条写 `running`，命令放后台跑。
+7. 做完后，把 `progress.md` 的 `STATUS:` 行写成 `S0-DONE`，再读 `handover.md` 的「方案版本」：已经是 `<短名>-v<k>`，说明 A 在你做 S0 时冻结了方案，不结束本轮，直接做 S1。还是「未冻结」，才结束本轮，回复 `STATUS: S0-DONE`，附复现输出摘要和基线失败清单。
 
 ## 每一步
 
-1. 按 `steps.md` 和 `full.md` 第 5 段做，一次只做一条用例。证明行为改变的用例，先 `red` 再 `green`；验证既有行为的用例可以直接 `green`。每次运行后，在「用例记录」里更新这条用例的状态、命令、输出摘要和日志文件。
+1. 按 `steps.md` 和 `full.md` 第 5 段做，一次只做一条用例。证明行为改变的用例，先 `red` 再 `green`；验证既有行为的用例可以直接 `green`。每次运行后，在「用例记录」里更新这条用例的状态、命令、输出摘要和日志文件。开始一条用例或一个子步骤时，更新 `progress.md` 的「当前步骤」：A 的监视脚本把 duo 目录里的写入当作你在干活的证据，只读不写超过 10 分钟会被判为卡住。
 2. 第一条正式回归测试就是锚定断言 A-1：
    - 把 `anchored/A-1.*` 的文本拷进测试代码，块首写 `ANCHORED id=A-1 begin`，块尾写 `ANCHORED id=A-1 end`，用该语言的注释语法。
    - 带 `CORE` 注释的核心行逐字保留，`CORE` 注释也保留。
    - 核心行以外的改动是机械适配，可以自己做，例如 import、夹具名、语法、缩进。commit trailer 加 `Flow: anchored-adapt A-1`。
    - 改任何核心行都是方向变更，必须先写 BLOCKING 的 R-n，等 A 批准。
    - 先运行它，确认它因为预期的根因失败；再写刚好让它通过的修复。
-3. 每个步骤完成 commit 之前做**定点读**：读 `rulings.md` 和 `batch.md` 里游标之后的新条目，处理适用的条目，更新 `progress.md` 的已读游标。同时确认这一步的用例已经写进「用例记录」：A 被这个 commit 唤醒后，要靠它轻检和转抄。
+3. 每个步骤完成 commit 之前做**定点读**：读 `rulings.md` 和 `batch.md` 里游标之后的新条目，处理适用的条目，更新 `progress.md` 的已读游标。同时确认这一步的用例已经写进「用例记录」：A 被这个 commit 唤醒后，要靠它轻检。
 4. commit，带 trailer，同时更新 `progress.md`。commit 要小：子步骤做完就提交，中间态用 `Flow: wip`。
-5. 日志只写进 duo 目录的 `logs/`，不写别处。运行日志很长时，交给子 agent 判读。结论要带证据，写路径加行号或 commit sha。
-6. 预计超过 2 分钟、你要停下等的事（长命令、等子 agent 交回），先在 duo 目录写 `running`。它只有一行：`<预计分钟> <在做什么>`。做完立即删掉。A 的监视脚本靠它区分「在跑长命令」和「卡住」；没有它，10 分钟没动静就会被判为卡住。
+5. 日志只写进 duo 目录的 `logs/`，不写别处。运行日志先用 `rg -n "FAIL|Error|Traceback" <日志>` 定位；命中太多或看不懂，再按「外包」交给子 agent。结论要带证据，写路径加行号或 commit sha。你自己加的诊断输出一律带前缀 `[DEBUG-duo]`，最后一步 commit 前用它搜一遍，删干净。
+6. 预计超过 2 分钟、你要停下等的事（长命令、等子 agent 交回），或预计连续只读超过 5 分钟（例如通读调用方代码），先在 duo 目录写 `running`。它只有一行：`<预计分钟> <在做什么>`。做完立即删掉。A 的监视脚本靠它区分「在跑长命令」和「卡住」；没有它，10 分钟没动静就会被判为卡住。
 7. 预计超过 2 分钟的命令放到后台跑，输出写进 `logs/`，再等它结束。Cursor：Shell 设 `block_until_ms: 0`，再用 AwaitShell 等。A 误判卡住、interrupt 你时，前台命令会被取消，后台命令照常跑完。
 
 **Flow trailer**，写在 commit message 末尾，项目自己的格式照旧：
@@ -93,7 +94,7 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 
 ## 外包
 
-宿主能让你开子 agent 时（Cursor 可以），能并行的活交给子 agent，不能并行的你自己串行做：
+宿主能让你开子 agent 时（Cursor 可以），能并行的活交给子 agent，不能并行的你自己串行做。开一个子 agent 本身就要一两分钟，所以只外包你自己做要超过 5 分钟的活，更小的自己做：
 
 | 外包 | 自己做 |
 |---|---|
@@ -104,7 +105,9 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 - 每个子 agent 只拿它的用例行、它负责的文件路径和运行命令，交回结果和证据。
 - 同一个文件不让两个 agent 同时改。
 - 子 agent 的结果由你核对后统一 commit。
-- 子 agent 在跑时，你继续做自己那条线。要停下等它时，按「每一步」第 6 条写 `running`。
+- 只用前台 Task：几个子 agent 放在同一条消息里发出，一起返回。不用后台子 agent：它的结果要等你结束本轮才送到，而你结束本轮就是回 A 一行 `STATUS:`。
+- 等它们期间先按「每一步」第 6 条写 `running`，返回后删掉。
+- 每个子 agent 的提示词带固定前缀：「不 commit，不 `git add`，不 stash；日志写 `<duo 目录>/logs/`；只改分给你的文件。」
 
 ## 裁决请求
 
@@ -119,7 +122,7 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 ```
 
 - 两种请求都不用另外通知 A。A 的监视脚本看到新的 `### R-` 标题就会醒来。
-- BLOCKING 时，先做不依赖它的步骤，每做完一个动作就读一次 `rulings.md`。
+- BLOCKING 时，先做不依赖它的步骤，每做完一个动作，用 Grep 查 `rulings.md` 里有没有 `### R-<n> →`，有了再读那一节。
 - 全部步骤都被阻塞时，结束本轮，回复 `STATUS: BLOCKED R-<n>`。
 - 你对 A 的裁决有异议时（包括你认为 A 判为「不改方案行为」的事其实改了），写一条新的 R-n 说明理由。
 
@@ -136,13 +139,8 @@ A 只在四种情况下 resume 你：
 
 ## 收尾
 
-DoD 是：
-- `steps.md` 的步骤全部完成
-- 全部本轮必做用例 `green`
-- 没有未修的 P0
-
-DoD 达成后：
-1. 按 `fixing-bugs`「停下与交付」第 1 步清掉你自己加的打点。
+DoD 以 `steps.md` 末尾为准。达成后：
+1. 清掉你自己加的打点：用 `[DEBUG-duo]` 搜一遍。清理改了跟踪文件的话，作为 `Flow: step S<末>` 提交，并只重跑原始复现；没改就直接往下。
 2. 结束本轮，回复下面这段：
 
 ```text

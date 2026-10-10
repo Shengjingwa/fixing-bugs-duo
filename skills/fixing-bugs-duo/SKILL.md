@@ -9,13 +9,15 @@ license: MIT
 
 调用本 skill 的会话是 **A**：诊断、写交接材料、监督、裁决、验收，并且是唯一和用户对话的会话。**B** 是 A 开的后台子 agent，只读 [b.md](b.md)，在任务 worktree 里按冻结的方案先红后绿。
 
-按需读：建 flow 文件时读 [files.md](files.md)；开了 B 之后读 [supervise.md](supervise.md)，里面是监督、终审和交付；审查时读 [review.md](review.md)。
+按需读：建 flow 文件时读 [files.md](files.md)；第 5 步开 B 之后立刻读 [supervise.md](supervise.md)，里面是监视脚本的事件、监督、终审和交付；审查时读 [review.md](review.md)。
+
+调用本 skill，就是要求 A 在 Cursor 里用 Shell 的 `notify_on_output` 监视 B，并授权 A 在 P0 和判卡住时对 B 设 `interrupt`，也授权 A 在豁免档自己 commit、push、建 Draft MR/PR。
 
 简单问题不开 B：快修档，以及第 4 步判为豁免的问题，A 单会话修完。
 
 ## 依赖
 
-- `fixing-bugs`（<https://github.com/Shengjingwa/fixing-bugs>）：先找本 skill 目录的同级目录 `../fixing-bugs/`，找不到再按宿主的 skill 清单找。A 用它的「开头」「快修」「停下与交付」和 `full.md` 第 1–4 段；B 用 `full.md` 第 5–6 段，和 `b.md` 不一致的地方以 `b.md` 为准。读不到时按 `fixing-bugs` 的「依赖」一节处理：标 `blocked`，写明缺什么，继续不依赖它的部分。
+- `fixing-bugs`（<https://github.com/Shengjingwa/fixing-bugs>）：先找本 skill 目录的同级目录 `../fixing-bugs/`，找不到再按宿主的 skill 清单找。A 用它的「开头」「升档」「快修」「排查」「停下与交付」和 `full.md` 第 1–4 段，豁免且有风险信号时读到第 6 段；B 用 `full.md` 第 5–6 段，和 `b.md` 不一致的地方以 `b.md` 为准。豁免档要 commit、push、建 MR，和「停下与交付」里「改动默认留在工作区」相反，以本 skill 为准。读不到时按 `fixing-bugs` 的「依赖」一节处理：标 `blocked`，写明缺什么，继续不依赖它的部分。
 - `diagnosing-bugs`、`tdd`：`fixing-bugs` 已声明，读取方式同上。
 
 ## 1. 开头
@@ -64,7 +66,7 @@ A 先自己判断，拿不准才问用户：
 
 1. 记下目标分支：`git -C <主仓库> branch --show-current`。输出为空（detached HEAD）时，目标分支记为「待用户」。
 2. 建任务 worktree：`git -C <主仓库> worktree add -b fix/<短名> <父目录>/<repo>-wt-<短名> HEAD`。分支已经存在时，短名加后缀 `-2`。
-3. 建 duo 目录和其中的 `logs/`。项目需要装依赖时，在后台装，输出写进 `logs/deps.txt`，不等它结束，直接往下做。
+3. 建 duo 目录和其中的 `logs/`。项目需要装依赖时，在后台装，输出写进 `logs/deps.txt`，命令结束时追加一行 `DEPS_DONE exit=<退出码>`，不等它结束，直接往下做。
 4. 查提交身份：在 worktree 里运行 `git config user.name` 和 `git config user.email`，两个都有值就用它们。缺了，从 `git -C <主仓库> log -5 --format="%an <%ae>"` 里挑候选，留到确认提问时问用户。
 5. flow 仓库不存在时：建目录，`git init`，按 [files.md](files.md) 建 `registry.md`。flow 仓库没有可用的提交身份时，给它配仓库级身份：`user.name` 为 `fixing-bugs-duo`，`user.email` 为 `fixing-bugs-duo@localhost`。flow 仓库只在本机用，这个身份不会进任务分支。建本任务子目录 `<短名>/`，commit。
 6. 读 `registry.md`，按「门槛硬条件」逐条核对，记下已命中、未命中和要问用户的。先不问，到第 4 步按需要再问。
@@ -76,7 +78,7 @@ A 先自己判断，拿不准才问用户：
 在任务 worktree 里做 `fixing-bugs` 的 `full.md` 第 1–2 段。
 
 - 原始复现命令和一次性 harness 放进 flow 的 `<短名>/repro/`，不放进 worktree。这样清理打点后它们还在，B 也能直接运行。
-- A 自己搭复现、打点。同时派只读子 agent 并行侦察：代码路径、git 历史（`log -S`、`blame`、bisect 候选）、日志。每个子 agent 只拿一句现象、复现命令和它负责的那个问题，交回带证据（路径加行号，或 commit sha）的结论。
+- A 自己搭复现、打点。同时派只读子 agent 并行侦察：代码路径、git 历史（`log -S`、`blame`、bisect 候选）、日志。用前台 Task，几个侦察 agent 和 A 自己的打点命令放在同一条消息里发出，一起返回，不用等通知。每个子 agent 只拿一句现象和它负责的那个问题，交回带证据（路径加行号，或 commit sha）的结论；不让它们运行复现命令，免得和 A 的打点抢 worktree。
 - 干净的 worktree 复现不出、而主仓库能复现时，说明 bug 依赖基线里的未提交改动。停下问用户：先把这些改动提交到一个分支、再从那个分支重建 worktree，还是只带哪几个文件。A 不擅自搬运改动。
 
 **完成：** `full.md` 第 2 段的完成条件全部满足；复现命令和 harness 在 flow 的 `repro/` 里，并已 commit。
@@ -106,7 +108,7 @@ A 先自己判断，拿不准才问用户：
 
 1. 按 `fixing-bugs`「停下与交付」第 1 步，清掉 worktree 里的打点，直到 `git status --short` 为空。
 2. 按 [files.md](files.md) 写 `handover.md` 和只有 S0 的 `steps.md`，再把 `rulings.md`、`batch.md`、`review-state.md` 建成只有标题的骨架（`last_reviewed_sha` 填 worktree 当前 HEAD），commit。B 启动时就要读这些文件。
-3. 用后台子 agent 开 B（Cursor：`Task`，`run_in_background: true`），提示词：
+3. 用后台子 agent 开 B（Cursor：`Task`，`run_in_background: true`；用户给 B 或审查 agent 指定了模型时，带上 `model`，并记进 `handover.md` 的「模型」），提示词：
 
 ```text
 你是 fixing-bugs-duo 的执行会话 B。先读 <本 skill 目录>/b.md，按它执行。
@@ -122,14 +124,9 @@ A 先自己判断，拿不准才问用户：
    - Windows：`powershell -NoProfile -ExecutionPolicy Bypass -File <本 skill 目录>/scripts/watch.ps1 -Worktree <路径> -Tag <短名> -Transcript <B 的转录>`
    - 其他：`bash <本 skill 目录>/scripts/watch.sh <路径> <短名> <B 的转录>`
 
-   脚本先打一行 `DUO_READY_<短名> pid=<pid> …`，之后每行是 `DUO_WAKE_<短名> <序号> <事件>`。事件有五种：
-   - `commit`：B 有带 `Flow: step`、`Flow: fix` 或没有 trailer 的新 commit。`wip` 和 `docs` 不唤醒 A，留到下次醒来一起处理。
-   - `request`：`progress.md` 出现新的 `### R-` 标题。
-   - `stall`：B 本该在干活，但 10 分钟没有任何动静，也没有未超时的 `running` 标记。判据见 supervise.md「卡住」。
-   - `heartbeat`：B 在干活期间，20 分钟没有任何事件。B 本轮结束后不发。
-   - `status`：`progress.md` 的 `STATUS:` 行变了。只在加了 `-WatchStatus`（`watch.sh` 用环境变量 `DUO_WATCH_STATUS=1`）时才有，供下面的退路用。
+   脚本先打一行 `DUO_READY_<短名> pid=<pid> …`，之后每行是 `DUO_WAKE_<短名> <序号> <事件>`。事件的含义和处理见 supervise.md。
 
-   起脚本后，先等到 `DUO_READY` 行再往下做（Cursor：AwaitShell 匹配 `^DUO_(READY|ERROR)_<短名>`）。等到的是 `DUO_ERROR_` 行时，按它写的原因修好再起。把 `DUO_READY` 行里的 pid 写进 `handover.md`，停脚本时用它：`Stop-Process -Id <pid>` 或 `kill <pid>`。宿主报的 PID 可能是外层 shell，停掉它，脚本还会在。
+   起脚本后，先等到 `DUO_READY` 行再往下做（Cursor：AwaitShell 匹配 `^DUO_(READY|ERROR)_<短名>`）。等到的是 `DUO_ERROR_` 行时，按它写的原因修好再起。传了转录、READY 行却是 `transcript=False`，说明路径错了，同样修好再起。把 `DUO_READY` 行里的 pid 写进 `handover.md`，停脚本时用它：`Stop-Process -Id <pid>` 或 `kill <pid>`。宿主报的 PID 可能是外层 shell，停掉它，脚本还会在。
 
    脚本中途出错，会打一行 `DUO_ERROR_<短名> <原因>` 后退出，A 会被唤醒。宿主报告脚本的 shell 退出、又不是 A 停的时，A 重启脚本并更新 pid。worktree 删掉后，脚本打一行 `DUO_EXIT_<短名>` 自己退出，这一行不唤醒 A。换 B 时，用新的转录路径重启脚本。
 
@@ -153,7 +150,9 @@ B 跑 S0 期间，A 在 flow 的 `<短名>/` 里写交接材料：
 
 然后用一次提问请用户确认：推荐方案、测试 seam、分流结果（轻量版或全流程），以及第 4 步并进来的问题。用户已授权 A 在范围内自选时，记下授权来源，不再问。等待期间可以继续完善文档。
 
-确认后冻结：答复写进对应文件，commit flow 仓库，打 tag `<短名>-v1`，在 `handover.md` 写方案版本。然后 resume B：「方案 v1 已冻结，读 steps.md，从 S1 开始」，再读 [supervise.md](supervise.md)。
+确认后冻结：答复写进对应文件，commit flow 仓库，打 tag `<短名>-v1`，在 `handover.md` 写方案版本。然后读 `progress.md` 的 `STATUS:` 行：
+- 已是 `S0-DONE`：resume B：「方案 v1 已冻结，读 steps.md，从 S1 开始」。
+- 还没有：B 在 S0 里。不 resume，也不 interrupt。B 结束 S0 前会读 `handover.md`，看到方案版本就直接开始 S1；它回 `S0-DONE` 时，A 再发这条指令。
 
 **完成：** 文件齐全；用户确认或授权有记录；tag 已打；B 已收到开始指令。
 

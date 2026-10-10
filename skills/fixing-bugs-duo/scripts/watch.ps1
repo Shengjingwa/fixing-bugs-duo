@@ -151,23 +151,25 @@ while ($true) {
     $ts = Get-TranscriptState
     if ($ts) {
         $idle = $ts.Idle
-        if ($ts.Length -ne $tsLength -or (Test-OtherActivity $now)) {
+        # Test-OtherActivity looks back StallMinutes, so when it is false the
+        # silence already lasted that long; activeAt only tracks the transcript.
+        if ($ts.Length -ne $tsLength) {
             $tsLength = $ts.Length
             $activeAt = $now
             $stallReported = $false
         }
+        if (Test-OtherActivity $now) {
+            $stallReported = $false
+        }
         elseif (-not $idle -and -not $stallReported -and ($now - $activeAt).TotalMinutes -ge $StallMinutes) {
-            if (Test-WorktreeEdits $now) {
-                $activeAt = $now
-            }
-            else {
+            if (-not (Test-WorktreeEdits $now)) {
                 $stallReported = $true
                 Send-Wake 'stall'
             }
         }
     }
-
-    if ($idle) {
+    # With a transcript, silence is already reported as stall; heartbeat is only for runs without one.
+    if ($idle -or $ts) {
         $lastEvent = $now
     }
     elseif (($now - $lastEvent).TotalMinutes -ge $HeartbeatMinutes) {

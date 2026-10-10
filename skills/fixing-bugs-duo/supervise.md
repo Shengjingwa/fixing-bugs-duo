@@ -1,23 +1,37 @@
 # A 的监督、终审与交付
 
-第 6 步冻结方案、resume B 之后读本文件。审查细节见 [review.md](review.md)，文件格式见 [files.md](files.md)。
+第 5 步开 B、起监视脚本之后立刻读本文件。审查细节见 [review.md](review.md)，文件格式见 [files.md](files.md)。
 
 ## 7. 监督
+
+监视脚本每行 `DUO_WAKE_<短名> <序号> <事件>`。一次醒来先处理完手上已有的全部 commit 和 R-n；之后到达的通知如果没有比 `last_reviewed_sha` 更新的 commit，也没有新的 R-n，读一行 `review-state.md` 就结束本轮。
 
 每次被唤醒，先看唤醒来源，再按下表处理：
 
 | 来源 | 做法 |
 |---|---|
-| `commit` | 对 `review-state.md` 里 `last_reviewed_sha` 之后的每个 commit，按 review.md 的触发分级处理 |
-| `request` | 读 `progress.md` 新增的 R-n，在 `rulings.md` 追加答复。B 结束本轮在等时，resume B；B 在跑时不打扰，B 会在下一个定点读到 |
-| `stall` | 按下文「卡住」处理 |
+| `commit` | B 有带 `Flow: step`、`Flow: fix` 或没有 trailer 的新 commit。`wip` 和 `docs` 不唤醒 A，留到下次醒来一起处理。对 `review-state.md` 里 `last_reviewed_sha` 之后的每个 commit，按 review.md 的触发分级处理 |
+| `request` | `progress.md` 出现新的 `### R-` 标题。读新增的 R-n，在 `rulings.md` 追加答复。B 结束本轮在等时，resume B；B 在跑时不打扰，B 会在下一个定点读到 |
+| `stall` | B 本该在干活，但 10 分钟没有任何动静，也没有未超时的 `running` 标记。按下文「卡住」处理 |
+| `status`（只在退路里有） | `progress.md` 的 `STATUS:` 行变了，处理同下面「B 本轮结束」 |
 | `DUO_ERROR_` 行，或宿主报告脚本退出 | 监视脚本停了。按错误原因修好，重启脚本，更新 `handover.md` 里的 pid。停掉期间 B 的 commit 和 R-n 没有唤醒 A，重启后先拍一次快照补审 |
-| `heartbeat` | 拍快照：`git --no-optional-locks log`、`progress.md`、B 的转录（可得时）。没有转录、B 本该在干活，且连续两次心跳都没有新 commit、新 R-n 或 `STATUS:` 变化时，按卡住处理 |
-| B 本轮结束，或 `status` | 读 B 的 `STATUS:` 行，按 [b.md](b.md) 的约定处理。宿主的结束通知和 `status` 事件可能都会到，同一行 `STATUS:` 只处理一次。B 的回复里没有 `STATUS:` 行时，先拍一次快照，再 resume B，要它按现状补一行 |
+| `heartbeat`（只在退路里有） | 拍快照：`git --no-optional-locks log` 和 `progress.md`。B 本该在干活，且连续两次心跳都没有新 commit、新 R-n 或 `STATUS:` 变化时，按卡住处理 |
+| B 本轮结束 | 读 B 的 `STATUS:` 行，同一行只处理一次，按下表办。回复里没有 `STATUS:` 行时，先读 `progress.md` 的 `STATUS:`；那里也是旧值，才 resume B 要它按现状补一行 |
 
-- **P0**：先落盘，再 resume B 并设 `interrupt: true`，消息写发现编号和证据。A→B 的消息只有四种：P0、流程指令（开始 S1、交付、用户确认的升版）、BLOCKING 答复通知、判卡住时重发的最后一条指令。其余一律写进 `batch.md`，靠 B 的定点读送达。
+`STATUS:` 的处理：
+
+| 状态 | A 做什么 |
+|---|---|
+| `S0-DONE` | 核对复现输出确实像 `handover.md` 写的那样失败，复现不符预期就回第 3 步。基线失败写进 `test-plan.md`。方案已冻结就 resume B：「方案 v1 已冻结，读 steps.md，从 S1 开始」；没冻结就等第 6 步 |
+| `BLOCKED R-<n>` | 按 `request` 行处理，答复后 resume B |
+| `PAUSED <原因>` | 按原因处理。缺提交身份时问用户，写进 `handover.md` 后 resume B |
+| `STOPPED` | 进入下面的换 B |
+| `DOD` | 进入第 8 步 |
+| `DELIVERED` / `DELIVER-BLOCKED` | 按第 8 步第 5 条处理 |
+
+- **P0**：先落盘，再 resume B 并设 `interrupt: true`，消息写发现编号和证据。P1、P2 不发消息，写进 `batch.md`，靠 B 的定点读送达。A 只在这几种情况下 resume B：P0、流程指令（开始 S1、交付、用户确认的升版、转达 MR/PR 评审意见）、BLOCKING 答复通知、判卡住时重发的最后一条指令、要它补 `STATUS:` 行、要它停手。
 - **要用户拍板的事**：推翻勿翻案项、改变方案行为、P1 遗留放行、同一问题 3 轮修不好、B 对裁决有异议且 A 复核后仍分歧。A 去问用户，B 先做不受影响的步骤。用户拍板改方案时，按 files.md 的升版规程走。用户没回应时，在 `handover.md` 标「待用户」；全部步骤被阻塞时暂停任务，A 和 B 都不得自行裁决。
-- **换 B**：`progress.md` 的压缩日志显示连续 3 个压缩间隔都短于 30 分钟，且剩余步骤 ≥ 3 时，A 建议用户换 B。用户同意后，A 用 SKILL.md 第 5 步的提示词新开一个 B（「本轮」写成「接着 progress.md 的当前步骤继续」），再把新 ID 写进 `handover.md`。B 出错退出时，同样新开一个 B 接上。
+- **换 B**：`progress.md` 的压缩日志显示连续 3 个压缩间隔都短于 30 分钟，且剩余步骤 ≥ 3 时，A 建议用户换 B。用户同意后，A 用 SKILL.md 第 5 步的提示词和 `handover.md` 里记的模型新开一个 B（「本轮」写成「接着 progress.md 的当前步骤继续」），把新 ID 和转录写进 `handover.md`，再用新转录重启监视脚本。B 出错退出时，同样新开一个 B 接上。
 - **A 自己压缩或恢复后**：读 `handover.md`、`review-state.md`、`progress.md`，以及 `git log <last_reviewed_sha>..HEAD`。按 `handover.md` 里的 pid 确认监视脚本还在跑，不在就重启，并更新 pid。
 
 ### 卡住
@@ -30,7 +44,7 @@
 B 的转录不能当作动静：Cursor 只在 B 一轮结束时才写子 agent 的转录，B 正常干活时它可以很久不变。转录只用来判断第 1 条。
 
 确认卡住后：
-1. A 用最后一条指令 interrupt B 一次，并汇报。调用本 skill 即授权 A 这样做，不用再问用户。消息里加一句：「你要是在等后台长命令，补写 `running` 标记，接着等。」interrupt 会取消 B 的前台命令，b.md 因此要求长命令放后台跑。
+1. A 用最后一条指令 interrupt B 一次，并汇报，不用再问用户。消息里加一句：「你要是在等后台长命令，补写 `running` 标记，接着等。」interrupt 会取消 B 的前台命令，b.md 因此要求长命令放后台跑。
 2. interrupt 之后又收到一次 `stall`，也就是又过了 10 分钟仍没有动静，就报给用户。用户同意后新开一个 B。新开之前，宿主若仍显示旧 B 在跑，先 interrupt 旧 B，要它停手并回复 `STATUS: STOPPED`；收不到这条回复，就报给用户，不开新 B，免得两个 B 同时写 worktree。
 
 ### 汇报
@@ -56,13 +70,8 @@ A 在自己的对话里汇报，每次一行，格式固定：
 ## 8. 终审、验收与交付
 
 1. 按 review.md 终审：最后一个 `[M]` 的全量审查要审整个任务区间，它兼作终审，不再另做一轮。终审时还要复读 `batch.md` 里的全部驳回项。
-2. **独立验收**：B 停着时，A 在任务 worktree 的最终 sha 上亲手重跑两类命令：未缩小的原始复现命令，以及 `test-plan.md` 里全部本轮必做用例。输出写回 `test-plan.md`，commit。B 的回报不能代替这一步。
-3. 核对 DoD：
-   - 规格表全部通过
-   - 全部步骤完成
-   - 没有 P0
-   - P1 遗留都经用户批准
-   - 生产路径上没有诊断前缀
+2. **独立验收**：B 停着时，A 在任务 worktree 的最终 sha 上亲手重跑两类命令：未缩小的原始复现命令，以及 `test-plan.md` 里全部本轮必做用例。输出写回 `test-plan.md`，同时把 `progress.md`「用例记录」整表一次转抄进 `test-plan.md`，commit。B 的回报不能代替这一步。B 交回 `STATUS: DOD` 时终审 agent 还在跑，也不用等，直接开始验收；慢命令放后台跑，同时核对 DoD 的其他条目。
+3. 逐条核对 `steps.md` 末尾的 DoD，那是 DoD 的唯一定义。
 
    终审或验收发现 P0 时，DoD 撤销，回到第 7 步。
 4. 通过后 resume B：「交付」，附终审意见和 `batch.md` 路径。B push 分支，向 `handover.md` 里的目标分支建 Draft MR/PR。
