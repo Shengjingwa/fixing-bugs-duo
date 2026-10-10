@@ -5,7 +5,7 @@
 - 会话 A 诊断根因、写方案和测试计划、审查、验收。你只和 A 对话。
 - 会话 B 是 A 在后台开的子 agent。它在独立的 worktree 里按冻结的方案先写失败的测试，再修到通过。
 
-A 盯着 B 的每个 commit 审查，B 遇到歧义向 A 请求裁决。最后 B 建 Draft MR/PR，合入由人确认。
+A 盯着 B 的每个 commit 审查。B 遇到歧义，或者同一条测试换了 3 种改法还不通过，就向 A 请求裁决。最后 B 建 Draft MR/PR，合入由人确认。
 
 它建在单会话的 [fixing-bugs](https://github.com/Shengjingwa/fixing-bugs) 之上，两个要一起装。大多数 bug 用 `/fixing-bugs` 就够；修复要分多步提交、碰到关键路径，或者你想让一个会话专门盯着另一个会话干活时，用 `/fixing-bugs-duo`。
 

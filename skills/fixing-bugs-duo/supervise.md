@@ -11,7 +11,7 @@
 | 来源 | 做法 |
 |---|---|
 | `commit` | B 有带 `Flow: step`、`Flow: fix` 或没有 trailer 的新 commit。`wip` 和 `docs` 不唤醒 A，留到下次醒来一起处理。对 `review-state.md` 里 `last_reviewed_sha` 之后的每个 commit，按 review.md 的触发分级处理 |
-| `request` | `progress.md` 出现新的 `### R-` 标题。读新增的 R-n，在 `rulings.md` 追加答复。B 结束本轮在等时，resume B；B 在跑时不打扰，B 会在下一个定点读到 |
+| `request` | `progress.md` 出现新的 `### R-` 标题。读新增的 R-n，在 `rulings.md` 追加答复。B 结束本轮在等时，resume B；B 在跑时不打扰，B 会在下一个定点读到。B 报改法上限的 R-n，说明根因或方案可能不对：A 读 B 存在 `logs/` 里的 diff 和失败输出，在临时 worktree 里重新核对根因；要改方案，按 files.md 的升版规程问用户 |
 | `stall` | B 本该在干活，但 10 分钟没有任何动静，也没有未超时的 `running` 标记。按下文「卡住」处理 |
 | `slow <分钟>` | B 在干活，但离上一个唤醒 A 的 commit 或 B 这一轮开始，已过了 `handover.md` 的「步骤超时」，之后每过一个步骤超时再报一次；`running` 标记不影响它。按下文「步骤超时」处理 |
 | `status`（只在退路里有） | `progress.md` 的 `STATUS:` 行变了，处理同下面「B 本轮结束」 |
