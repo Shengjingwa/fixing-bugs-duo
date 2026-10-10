@@ -132,7 +132,7 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 
 ## A 的消息
 
-A 只在五种情况下 resume 你：
+A 只在下面几种情况下 resume 你：
 1. P0：
    1. 先运行 `git status --short`。有没提交的半步改动时，先把它 commit 成 `Flow: wip`，message 里写「被 P0 打断，未完成」。测试没过也照样提交。
    2. 再修 P0，单独 commit，带 `Flow: fix <发现编号>`。
@@ -141,6 +141,7 @@ A 只在五种情况下 resume 你：
 3. BLOCKING 答复通知：读 `rulings.md`，继续。
 4. 判你卡住时重发的最后一条指令：按 `progress.md` 和 `git log` 的现状接着做。在等后台长命令时，补写 `running`，接着等同一个 shell。
 5. DoD 撤销：修消息里点名的 `batch.md` 条目，每条单独 commit，带 `Flow: fix <发现编号>`。修完按「收尾」再回一次 `STATUS: DOD`。
+6. 步骤超时：这一步做得太久，用户让 A 打断你。先按第 1 种的第 1 条把半步改动 commit 成 `Flow: wip`，message 写「步骤超时打断，未完成」；再结束本轮，回复 `STATUS: PAUSED 步骤超时：<卡在哪、试过什么、还差什么>`。A 之后 resume 你时，按 `rulings.md` 里新的裁决继续。
 
 ## 收尾
 

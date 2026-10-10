@@ -64,6 +64,7 @@ B 的 `progress.md`、`logs/` 和 `running` 不在 flow 仓库里，在任务 wo
 - 依赖：<无需安装 | 已装好 | 后台安装中，日志 logs/deps.txt>
 - 待用户：<无 | 事项>
 - 原始复现：repro/<文件>，预期失败样子：<一句>
+- 步骤超时：<N> 分钟，N = max(30, 4 × SKILL.md 第 4 步的一轮耗时)，向上取整；已报 slow：<无 | S<n>>
 
 ## 执行口径
 - 勿翻案项见 rulings.md 预埋区

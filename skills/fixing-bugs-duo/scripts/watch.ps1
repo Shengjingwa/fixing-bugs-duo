@@ -5,7 +5,8 @@ param(
     [switch]$WatchStatus,
     [int]$PollSeconds = 15,
     [int]$HeartbeatMinutes = 20,
-    [int]$StallMinutes = 10
+    [int]$StallMinutes = 10,
+    [int]$StepMinutes = 30
 )
 
 # A is woken only by lines it matches, so a crash must say so on stdout.
@@ -115,8 +116,13 @@ $requests = Get-RequestCount
 $status = Get-StatusLine
 $ts = Get-TranscriptState
 $tsLength = if ($ts) { $ts.Length } else { -1 }
+$wasIdle = [bool]($ts -and $ts.Idle)
 $activeAt = Get-Date
 $stallReported = $false
+# slow: B is busy but has not handed over a commit for review, or started a
+# new turn, for StepMinutes; repeated every StepMinutes. Ignores duo/running.
+$stepAt = $activeAt
+$slowAt = $StepMinutes
 Write-Output "DUO_READY_$Tag pid=$PID head=$head requests=$requests transcript=$([bool]$ts) duo=$duo"
 
 while ($true) {
@@ -129,7 +135,11 @@ while ($true) {
 
     $h = Get-Head
     if ($h -and $h -ne $head) {
-        if (-not $head -or (Test-NeedsReview $head $h)) { Send-Wake "commit $h" }
+        if (-not $head -or (Test-NeedsReview $head $h)) {
+            Send-Wake "commit $h"
+            $stepAt = $now
+            $slowAt = $StepMinutes
+        }
         $head = $h
     }
 
@@ -153,11 +163,19 @@ while ($true) {
         $idle = $ts.Idle
         # Test-OtherActivity looks back StallMinutes, so when it is false the
         # silence already lasted that long; activeAt only tracks the transcript.
-        if ($ts.Length -ne $tsLength) {
+        $grew = $ts.Length -ne $tsLength
+        if ($grew) {
             $tsLength = $ts.Length
             $activeAt = $now
             $stallReported = $false
         }
+        # A resume appends A's message at once, so B started a new turn when
+        # the transcript grew or stopped ending in turn_ended.
+        if (-not $idle -and ($grew -or $wasIdle)) {
+            $stepAt = $now
+            $slowAt = $StepMinutes
+        }
+        $wasIdle = $idle
         if (Test-OtherActivity $now) {
             $stallReported = $false
         }
@@ -165,6 +183,13 @@ while ($true) {
             if (-not (Test-WorktreeEdits $now)) {
                 $stallReported = $true
                 Send-Wake 'stall'
+            }
+        }
+        if (-not $idle -and $StepMinutes -gt 0) {
+            $minutes = [int][math]::Floor(($now - $stepAt).TotalMinutes)
+            if ($minutes -ge $slowAt) {
+                Send-Wake "slow $minutes"
+                $slowAt = $minutes + $StepMinutes
             }
         }
     }

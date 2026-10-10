@@ -8,7 +8,7 @@ param([string]$Scenario = '', [string]$Root = '')
 $ErrorActionPreference = 'Stop'
 $watch = Join-Path $PSScriptRoot '..\skills\fixing-bugs-duo\scripts\watch.ps1'
 $exe = (Get-Process -Id $PID).Path
-$scenarios = @('not-git', 'events', 'stall', 'idle', 'running', 'edits')
+$scenarios = @('not-git', 'events', 'stall', 'idle', 'running', 'edits', 'slow-repeat', 'slow-step', 'slow-turn')
 
 function Quote([string]$s) { return '"' + $s + '"' }
 
@@ -160,7 +160,7 @@ try {
         'events' {
             $r = New-Worktree
             $h0 = Invoke-Git -C $r.Wt rev-parse HEAD
-            Start-Watch $r @('-WatchStatus', '-HeartbeatMinutes', '1', '-StallMinutes', '1')
+            Start-Watch $r @('-WatchStatus', '-HeartbeatMinutes', '1', '-StallMinutes', '1', '-StepMinutes', '1')
             $ready = Wait-Ready
             Check ($ready -match " head=$h0 requests=0 transcript=False ") 'ready line reports head, requests and no transcript'
             New-Commit $r 'wip' 'Flow: wip' | Out-Null
@@ -177,6 +177,7 @@ try {
             $hb = Wait-Line '^DUO_WAKE_t 5 heartbeat$' 100
             Check ($hb -ge 0 -and $hb - $quietFrom -ge 50) "heartbeat after a quiet minute (after $([int]($hb - $quietFrom))s)"
             Check (@(Get-Wakes | Where-Object { $_ -eq 'stall' }).Count -eq 0) 'no stall without a transcript'
+            Check (@(Get-Wakes | Where-Object { $_ -like 'slow *' }).Count -eq 0) 'no slow without a transcript'
             for ($i = 0; $i -lt 10 -and (Test-Path -LiteralPath $r.GitDir); $i++) {
                 $ErrorActionPreference = 'Continue'
                 & git -C $r.Main worktree remove --force $r.Wt 2>&1 | Out-Null
@@ -202,7 +203,7 @@ try {
         'idle' {
             $r = New-Worktree
             $tr = New-Transcript $r $true
-            Start-Watch $r @('-Transcript', (Quote $tr), '-StallMinutes', '1', '-HeartbeatMinutes', '1')
+            Start-Watch $r @('-Transcript', (Quote $tr), '-StallMinutes', '1', '-HeartbeatMinutes', '1', '-StepMinutes', '1')
             Wait-Ready | Out-Null
             Set-Quiet $r
             Start-Sleep -Seconds 80
@@ -234,6 +235,48 @@ try {
             }
             $wakes = Get-Wakes
             Check ($wakes.Count -eq 0) "no stall while B edits tracked files: $($wakes -join ', ')"
+        }
+        'slow-repeat' {
+            $r = New-Worktree
+            $tr = New-Transcript $r $false
+            [IO.File]::WriteAllText((Join-Path $r.Duo 'running'), "30`nslow test suite`n")
+            Start-Watch $r @('-Transcript', (Quote $tr), '-StepMinutes', '1')
+            Wait-Ready | Out-Null
+            Start-Sleep -Seconds 30
+            New-Commit $r 'wip' 'Flow: wip' | Out-Null
+            $first = Wait-Line '^DUO_WAKE_t 1 slow 1$' 90
+            Check ($first -ge 55 -and $first -lt 85) "slow 1 a minute after start, despite a running marker and a wip commit (at $([int]$first)s)"
+            $second = Wait-Line '^DUO_WAKE_t 2 slow 2$' 90
+            Check ($second -ge 115 -and $second -lt 145) "slow 2 one more minute later (at $([int]$second)s)"
+        }
+        'slow-step' {
+            $r = New-Worktree
+            $tr = New-Transcript $r $false
+            Start-Watch $r @('-Transcript', (Quote $tr), '-StepMinutes', '1')
+            Wait-Ready | Out-Null
+            Check ((Wait-Line '^DUO_WAKE_t 1 slow 1$' 90) -ge 0) 'slow 1 before the step commit'
+            $s1 = New-Commit $r 's1' 'Flow: step S1'
+            $committed = Get-Elapsed
+            Check ((Wait-Line "^DUO_WAKE_t 2 commit $s1$" 15) -ge 0) 'Flow: step commit wakes'
+            $at = Wait-Line '^DUO_WAKE_t 3 slow 1$' 100
+            $gap = $at - $committed
+            Check ($at -ge 0 -and $gap -ge 55 -and $gap -lt 85) "a Flow: step commit restarts the timer and its minutes (slow 1 $([int]$gap)s after it): $((Get-Wakes) -join ', ')"
+        }
+        'slow-turn' {
+            $r = New-Worktree
+            $tr = New-Transcript $r $false
+            Start-Watch $r @('-Transcript', (Quote $tr), '-StepMinutes', '1')
+            Wait-Ready | Out-Null
+            Check ((Wait-Line '^DUO_WAKE_t 1 slow 1$' 90) -ge 0) 'slow 1 during the first turn'
+            [IO.File]::AppendAllText($tr, '{"type":"turn_ended","status":"success"}' + "`n")
+            Start-Sleep -Seconds 70
+            $wakes = Get-Wakes
+            Check ($wakes.Count -eq 1) "no slow while B is idle: $($wakes -join ', ')"
+            [IO.File]::AppendAllText($tr, '{"role":"user","message":{"content":[{"type":"text","text":"next"}]}}' + "`n")
+            $resumed = Get-Elapsed
+            $at = Wait-Line '^DUO_WAKE_t 2 slow 1$' 100
+            $gap = $at - $resumed
+            Check ($at -ge 0 -and $gap -ge 55 -and $gap -lt 85) "a new turn restarts the timer and its minutes (slow 1 $([int]$gap)s after it): $((Get-Wakes) -join ', ')"
         }
         default { Fail "unknown scenario" }
     }

@@ -120,9 +120,9 @@ A 先自己判断，拿不准才问用户：
 ```
 
 4. 把 B 的 agent ID 写进 `handover.md`，并在对话里告诉用户（带链接）。
-5. 在后台起监视脚本，工作目录设为 flow 仓库，用宿主的输出通知唤醒 A。Cursor 用 Shell 的 `notify_on_output`，匹配 `^DUO_(WAKE|ERROR)_<短名>`。B 的转录路径在开 B 时由宿主返回，一并传进去：
-   - Windows：`powershell -NoProfile -ExecutionPolicy Bypass -File <本 skill 目录>/scripts/watch.ps1 -Worktree <路径> -Tag <短名> -Transcript <B 的转录>`
-   - 其他：`bash <本 skill 目录>/scripts/watch.sh <路径> <短名> <B 的转录>`
+5. 在后台起监视脚本，工作目录设为 flow 仓库，用宿主的输出通知唤醒 A。Cursor 用 Shell 的 `notify_on_output`，匹配 `^DUO_(WAKE|ERROR)_<短名>`。B 的转录路径在开 B 时由宿主返回，一并传进去。步骤超时 `<N>` 用 `handover.md` 里的值。
+   - Windows：`powershell -NoProfile -ExecutionPolicy Bypass -File <本 skill 目录>/scripts/watch.ps1 -Worktree <路径> -Tag <短名> -Transcript <B 的转录> -StepMinutes <N>`
+   - 其他：`DUO_STEP_MINUTES=<N> bash <本 skill 目录>/scripts/watch.sh <路径> <短名> <B 的转录>`
 
    脚本先打一行 `DUO_READY_<短名> pid=<pid> …`，之后每行是 `DUO_WAKE_<短名> <序号> <事件>`。事件的含义和处理见 supervise.md。
 
@@ -150,7 +150,7 @@ B 跑 S0 期间，A 在 flow 的 `<短名>/` 里写交接材料：
 
 然后用一次提问请用户确认：推荐方案、测试 seam、分流结果（轻量版或全流程），以及第 4 步并进来的问题。用户已授权 A 在范围内自选时，记下授权来源，不再问。等待期间可以继续完善文档。
 
-确认后，答复写进对应文件，commit flow 仓库。冻结要等两件事都到位：用户确认，以及 B 回了 `S0-DONE`、按 supervise.md 的 `S0-DONE` 行核对通过。后到的那件一到就冻结：打 tag `<短名>-v1`，在 `handover.md` 写方案版本，commit，再 resume B：「方案 v1 已冻结，读 steps.md，从 S1 开始」。B 还在 S0 里时，不 resume，也不 interrupt。
+确认后，答复写进对应文件，commit flow 仓库。冻结要等两件事都到位：用户确认，以及 B 回了 `S0-DONE`、按 supervise.md 的 `S0-DONE` 行核对通过。后到的那件一到就冻结：打 tag `<短名>-v1`，在 `handover.md` 写方案版本，commit，再 resume B：「方案 v1 已冻结，读 steps.md，从 S1 开始」。B 还在 S0 里时，不 resume，也不 interrupt；用户在步骤超时时选了「打断 B」除外。
 
 **完成：** 文件齐全；用户确认或授权有记录；tag 已打；B 已收到开始指令。
 

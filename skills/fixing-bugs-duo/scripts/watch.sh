@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # usage: watch.sh <worktree> <tag> [transcript]
-# env:   DUO_POLL_SECONDS (15)  DUO_HEARTBEAT_MINUTES (20)  DUO_STALL_MINUTES (10)  DUO_WATCH_STATUS (0|1)
+# env:   DUO_POLL_SECONDS (15)  DUO_HEARTBEAT_MINUTES (20)  DUO_STALL_MINUTES (10)  DUO_STEP_MINUTES (30)  DUO_WATCH_STATUS (0|1)
 # On Windows use watch.ps1: stopping Git for Windows' bash.exe launcher leaves this script running.
 wt="$1"
 tag="$2"
@@ -8,6 +8,7 @@ transcript="${3:-}"
 poll="${DUO_POLL_SECONDS:-15}"
 beat_min="${DUO_HEARTBEAT_MINUTES:-20}"
 stall_min="${DUO_STALL_MINUTES:-10}"
+step_min="${DUO_STEP_MINUTES:-30}"
 watch_status="${DUO_WATCH_STATUS:-0}"
 
 git_dir=$(git --no-optional-locks -C "$wt" rev-parse --absolute-git-dir 2>/dev/null) || {
@@ -102,8 +103,14 @@ head=$(head_of)
 requests=$(requests_of)
 status=$(status_of)
 tlen=$(transcript_len)
+was_idle=0
+if [ "$tlen" != -1 ] && transcript_idle; then was_idle=1; fi
 active_at=$last
 stall_reported=0
+# slow: B is busy but has not handed over a commit for review, or started a
+# new turn, for step_min minutes; repeated every step_min. Ignores duo/running.
+step_at=$last
+slow_at=$step_min
 echo "DUO_READY_${tag} pid=$$ head=${head} requests=${requests} transcript=$([ "$tlen" != -1 ] && echo True || echo False) duo=${duo}"
 
 while true; do
@@ -118,6 +125,8 @@ while true; do
   if [ -n "$h" ] && [ "$h" != "$head" ]; then
     if [ -z "$head" ] || needs_review "$head" "$h"; then
       wake "commit ${h}"
+      step_at=$now
+      slow_at=$step_min
     fi
     head=$h
   fi
@@ -142,17 +151,33 @@ while true; do
     transcript_idle && idle=1
     # other_activity looks back stall_min minutes, so when it fails the silence
     # already lasted that long; active_at only tracks the transcript.
+    grew=0
     if [ "$t" != "$tlen" ]; then
       tlen=$t
       active_at=$now
       stall_reported=0
+      grew=1
     fi
+    # A resume appends A's message at once, so B started a new turn when
+    # the transcript grew or stopped ending in turn_ended.
+    if [ "$idle" = 0 ] && { [ "$grew" = 1 ] || [ "$was_idle" = 1 ]; }; then
+      step_at=$now
+      slow_at=$step_min
+    fi
+    was_idle=$idle
     if other_activity "$now"; then
       stall_reported=0
     elif [ "$idle" = 0 ] && [ "$stall_reported" = 0 ] && [ $((now - active_at)) -ge $((stall_min * 60)) ]; then
       if ! worktree_edits; then
         stall_reported=1
         wake stall
+      fi
+    fi
+    if [ "$idle" = 0 ] && [ "$step_min" -gt 0 ]; then
+      mins=$(((now - step_at) / 60))
+      if [ "$mins" -ge "$slow_at" ]; then
+        wake "slow ${mins}"
+        slow_at=$((mins + step_min))
       fi
     fi
   fi
