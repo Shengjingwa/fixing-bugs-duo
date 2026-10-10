@@ -1,0 +1,27 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  watch-ps1:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        powershell: [pwsh, powershell]
+    steps:
+      - uses: actions/checkout@v5
+      - name: tests/test-watch.ps1 under ${{ matrix.powershell }}
+        shell: pwsh
+        run: ${{ matrix.powershell }} -NoProfile -ExecutionPolicy Bypass -File tests/test-watch.ps1
+
+  watch-sh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: tests/test-watch.sh
+        run: bash tests/test-watch.sh
