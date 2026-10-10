@@ -55,7 +55,7 @@
 | 1. 方案符合性 | 只实施了选定方案；没碰禁区；根因被消除或隔离，不是遮住症状 | `problem-and-solutions.md` 的选定方案、根因、禁区 |
 | 2. 断言方向抽样 | 抽 K 条断言，K = min(10, 本周期新增和修改的断言数)，必抽下面两类，其余随机补足。核对每条断言测的是方案和测试计划的要求，而不是代码现状 | `test-plan.md` 的对应用例行；`anchored/` 原文；`rulings.md` 的锚定登记 |
 | 3. 相邻功能（A 自查） | `test-plan.md` 第 8 维的用例都在，`progress.md`「用例记录」里都是 green；必要时在 B 停着时亲手跑一遍 | `test-plan.md` 第 8 维 |
-| 4. 清洁与攒批（A 自查） | 生产路径没有诊断前缀（`git grep` 搜）；`git diff --stat` 里没有与 bug 无关的文件；`git diff --check <起点>..HEAD` 无输出（有输出记 P2）；`git log --format=%B` 里 trailer 齐全；`batch.md` 里该本周期修的条目已修 | `batch.md`；诊断前缀 |
+| 4. 清洁与攒批（A 自查） | 生产路径没有诊断前缀（`git grep` 搜）；`git diff --stat` 里没有与 bug 无关的文件；`git diff --check <起点>..HEAD` 无输出（仓库文件以 CRLF 存储时加 `-c core.whitespace=cr-at-eol`；有输出记 P2）；`git log --format=%B` 里 trailer 齐全；`batch.md` 里该本周期修的条目已修 | `batch.md`；诊断前缀 |
 
 维度 2 必抽的两类：
 - 同一个 commit 里，既改了被测实现，又改了对应断言的期望值。这是假绿的典型形态。
