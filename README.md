@@ -102,7 +102,7 @@ A 靠 `scripts/` 里的监视脚本醒来。下面几种情况，脚本都会唤
 
 前提：
 1. 仓库是 git 仓库，能建 worktree，git 版本不低于 2.15（要用 `--no-optional-locks`）。
-2. 宿主能开后台子 agent，并能给运行中的子 agent 发消息。Cursor 可以，它的子 agent 也能再开子 agent。宿主不支持时，A 把 B 的启动提示词写进文件，请你新开一个聊天粘贴；A 给 B 的指令写进交接文件，由你在 B 的聊天里发一句「继续」。
+2. 宿主能开后台子 agent，并能给运行中的子 agent 发消息。Cursor 可以，它的子 agent 也能再开子 agent。宿主不支持时，A 把 B 的启动提示词写进文件，请你新开一个聊天粘贴；A 给 B 的指令写进交接文件，由你在 B 的聊天里发一句「继续」。B 在这种方式下卡住时，A 会请你先停掉 B 当前这一轮再发「继续」；还不动，再请你停掉它，新开一个聊天接手。
 3. 宿主能用后台命令的输出唤醒 agent，例如 Cursor Shell 的 `notify_on_output`。
 4. B 的 commit 会进 MR/PR，要用真实的 git 身份。仓库没有配置 `user.name` 和 `user.email` 时，A 会在确认方案时一起问你用哪个身份，不会自己编一个。
 5. 平台：在 Windows + Cursor 上试跑和测试过，监视脚本用 `scripts/watch.ps1`，Windows 自带的 PowerShell 5.1 就能跑。`scripts/watch.sh` 给 Linux 和 macOS 用，只在 Windows 的 Git Bash 里测过。

@@ -65,7 +65,7 @@ A 先自己判断，拿不准才问用户：
 ## 2. 建现场
 
 1. 记下目标分支：`git -C <主仓库> branch --show-current`。输出为空（detached HEAD）时，目标分支记为「待用户」。
-2. 建任务 worktree：`git -C <主仓库> worktree add -b fix/<短名> <父目录>/<repo>-wt-<短名> HEAD`。分支已经存在时，短名加后缀 `-2`。
+2. 建任务 worktree：`git -C <主仓库> worktree add -b fix/<短名> <父目录>/<repo>-wt-<短名> HEAD`。运行前先查短名用过没有：分支 `fix/<短名>`，以及 flow 仓库里的 `<短名>/`、`archive/<短名>/` 和 tag `<短名>-v1`。任一项已经存在，短名依次加后缀 `-2`、`-3`，直到四项都不存在。
 3. 建 duo 目录和其中的 `logs/`。项目需要装依赖时，在后台装，输出写进 `logs/deps.txt`，命令结束时追加一行 `DEPS_DONE exit=<退出码>`，不等它结束，直接往下做。
 4. 查提交身份：在 worktree 里运行 `git config user.name` 和 `git config user.email`，两个都有值就用它们。缺了，从 `git -C <主仓库> log -5 --format="%an <%ae>"` 里挑候选，留到确认提问时问用户。
 5. flow 仓库不存在时：建目录，`git init`，按 [files.md](files.md) 建 `registry.md`。flow 仓库没有可用的提交身份时，给它配仓库级身份：`user.name` 为 `fixing-bugs-duo`，`user.email` 为 `fixing-bugs-duo@localhost`。flow 仓库只在本机用，这个身份不会进任务分支。建本任务子目录 `<短名>/`，commit。
@@ -89,7 +89,7 @@ A 先自己判断，拿不准才问用户：
 
 | 情况 | 做法 |
 |---|---|
-| 没命中硬条件，并且满足其一：≤2 步；≤4 步且一轮耗时不超过 5 分钟 | **豁免**：A 不开 B，自己在任务 worktree 里按 `fixing-bugs` 修完。没有风险信号时接排查档第 3 步；有风险信号时接 `full.md` 第 3 段，文档放 flow 的 `<短名>/`。3–4 步的豁免，交付前按 [review.md](review.md) 的轻量版派 1 个审查 agent 看维度 1、2；没有 flow 文档时，给它的文档片段换成根因、修好标准和回归测试的期望。按「停下与交付」收尾后，A 用记下的提交身份 commit、push，向目标分支建 Draft MR/PR，按下文「交付报告」报告，写明为什么没开 B，再做第 9 步。 |
+| 没命中硬条件，并且满足其一：≤2 步；≤4 步且一轮耗时不超过 5 分钟 | **豁免**：A 不开 B，自己在任务 worktree 里按 `fixing-bugs` 修完。没有风险信号时接排查档第 3 步；有风险信号时接 `full.md` 第 3 段，文档放 flow 的 `<短名>/`。按「停下与交付」收尾后，A 按路径 `git add` 本轮改动和新文件，用记下的提交身份 commit。3–4 步的豁免，接着按 [review.md](review.md) 的轻量版派 1 个审查 agent 看维度 1、2，审这个 commit（`<sha>~1..<sha>`）；没有 flow 文档时，给它的文档片段换成根因、修好标准和回归测试的期望。审出的问题修好后，重跑原始复现和相关测试，再另 commit。然后 push，向目标分支建 Draft MR/PR，按下文「交付报告」报告，写明为什么没开 B，再做第 9 步。 |
 | 其余没命中硬条件、≤8 步的 | **轻量版**：只在最后一步标 `[M]`，只在最后一步的完成 commit 上做一次全量审查 |
 | >8 步，或命中硬条件 | **全流程**：`[M]` 按 [files.md](files.md) 的规则标，每个 `[M]` 做一次全量审查；历史翻车型判据各写一条锚定断言 |
 
@@ -108,7 +108,7 @@ A 先自己判断，拿不准才问用户：
 
 1. 按 `fixing-bugs`「停下与交付」第 1 步，清掉 worktree 里的打点，直到 `git status --short` 为空。
 2. 按 [files.md](files.md) 写 `handover.md` 和只有 S0 的 `steps.md`，再把 `rulings.md`、`batch.md`、`review-state.md` 建成只有标题的骨架（`last_reviewed_sha` 填 worktree 当前 HEAD），commit。B 启动时就要读这些文件。
-3. 用后台子 agent 开 B（Cursor：`Task`，`run_in_background: true`；用户给 B 或审查 agent 指定了模型时，带上 `model`，并记进 `handover.md` 的「模型」），提示词：
+3. 用后台子 agent 开 B（Cursor：`Task`，`run_in_background: true`，之后每次 resume B 也带上它，否则 A 会一直等到 B 这一轮结束；用户给 B 或审查 agent 指定了模型时，带上 `model`，并记进 `handover.md` 的「模型」），提示词：
 
 ```text
 你是 fixing-bugs-duo 的执行会话 B。先读 <本 skill 目录>/b.md，按它执行。
@@ -132,7 +132,7 @@ A 先自己判断，拿不准才问用户：
 
 **退路：两个独立聊天。** 宿主没有后台子 agent，或不能给运行中的子 agent 发消息时：
 1. A 把上面的提示词写进 flow 的 `<短名>/b-prompt.md`，请用户新开一个聊天粘贴。
-2. 监视脚本加 `-WatchStatus`，不传转录。B 每次停下都写 `progress.md` 的 `STATUS:` 行，A 靠 `status` 事件知道。
+2. 监视脚本打开 `status` 事件，不传转录：Windows 在上面第 5 条的命令里去掉 `-Transcript`，加 `-WatchStatus`；其他平台去掉 `<B 的转录>`，在命令前加 `DUO_WATCH_STATUS=1`。B 每次停下都写 `progress.md` 的 `STATUS:` 行，A 靠 `status` 事件知道。
 3. A 给 B 的指令（开始 S1、BLOCKING 答复、P0、交付）追加进 `handover.md` 的「给 B 的指令」，编号 `I-<n>`。commit 后，请用户在 B 的聊天里发「继续」。B 在跑时不用转达，B 会在定点读时读到。
 4. B 的 BLOCKING 请求等 30 分钟没有答复时，B 直接问用户。
 
@@ -150,9 +150,7 @@ B 跑 S0 期间，A 在 flow 的 `<短名>/` 里写交接材料：
 
 然后用一次提问请用户确认：推荐方案、测试 seam、分流结果（轻量版或全流程），以及第 4 步并进来的问题。用户已授权 A 在范围内自选时，记下授权来源，不再问。等待期间可以继续完善文档。
 
-确认后冻结：答复写进对应文件，commit flow 仓库，打 tag `<短名>-v1`，在 `handover.md` 写方案版本。然后读 `progress.md` 的 `STATUS:` 行：
-- 已是 `S0-DONE`：resume B：「方案 v1 已冻结，读 steps.md，从 S1 开始」。
-- 还没有：B 在 S0 里。不 resume，也不 interrupt。B 结束 S0 前会读 `handover.md`，看到方案版本就直接开始 S1；它回 `S0-DONE` 时，A 再发这条指令。
+确认后，答复写进对应文件，commit flow 仓库。冻结要等两件事都到位：用户确认，以及 B 回了 `S0-DONE`、按 supervise.md 的 `S0-DONE` 行核对通过。后到的那件一到就冻结：打 tag `<短名>-v1`，在 `handover.md` 写方案版本，commit，再 resume B：「方案 v1 已冻结，读 steps.md，从 S1 开始」。B 还在 S0 里时，不 resume，也不 interrupt。
 
 **完成：** 文件齐全；用户确认或授权有记录；tag 已打；B 已收到开始指令。
 
@@ -174,7 +172,7 @@ B 跑 S0 期间，A 在 flow 的 `<短名>/` 里写交接材料：
 4. 清理现场。删 worktree 前：
    - 运行 `git -C <worktree> status --short`。只剩运行生成物时，下面的 `worktree remove` 加 `--force`，否则 git 会因为未跟踪文件拒绝删除。还有别的改动或未跟踪文件时，先弄清是谁写的、要不要留，不加 `--force`。
    - A 的 shell 先切出 worktree，从那里启动的后台进程也要停掉。Windows 上，只要还有进程的工作目录在 worktree 里，删除就会失败。这时 git 已注销这个 worktree，只剩目录，切出、停掉这些进程后再删目录。
-   - 已合入：`git -C <主仓库> worktree remove <worktree>`，duo 目录随之删掉；再 `git -C <主仓库> branch -d fix/<短名>`。远端分支按平台设置处理，多数平台合入时会自动删除。
+   - 已合入：`git -C <主仓库> worktree remove <worktree>`，duo 目录随之删掉；再 `git -C <主仓库> branch -d fix/<短名>`。它报 `not fully merged` 时（推送时没带 `-u`，或 squash 合入，都可能这样），确认 `git -C <主仓库> rev-parse fix/<短名>` 等于 MR/PR 的最后一个 commit，再改用 `branch -D`；不相等就停下问用户。远端分支按平台设置处理，多数平台合入时会自动删除。
    - 放弃：同样删掉 worktree，本地分支用 `branch -D` 删。远端分支删不删、Draft MR/PR 关不关，在同一条消息里问用户，默认保留。
    - 用户要求保留现场时，在 `handover.md` 写明原因。
 

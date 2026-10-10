@@ -53,7 +53,7 @@ status_of() {
 }
 
 transcript_len() {
-  if [ "$t" != -1 ] && [ -f "$transcript" ]; then wc -c < "$transcript" | tr -d ' '; else echo -1; fi
+  if [ -n "$transcript" ] && [ -f "$transcript" ]; then wc -c < "$transcript" | tr -d ' '; else echo -1; fi
 }
 
 transcript_idle() {
