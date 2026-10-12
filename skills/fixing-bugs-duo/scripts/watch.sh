@@ -2,6 +2,8 @@
 # usage: watch.sh <worktree> <tag> [transcript]
 # env:   DUO_POLL_SECONDS (15)  DUO_HEARTBEAT_MINUTES (20)  DUO_STALL_MINUTES (10)  DUO_STEP_MINUTES (30)  DUO_WATCH_STATUS (0|1)
 # On Windows use watch.ps1: stopping Git for Windows' bash.exe launcher leaves this script running.
+# Pass a transcript only for a Cursor subagent: idle means its last line has "type":"turn_ended".
+# Other hosts' transcripts may never write that line, and may grow mid-turn and keep resetting slow.
 wt="$1"
 tag="$2"
 transcript="${3:-}"

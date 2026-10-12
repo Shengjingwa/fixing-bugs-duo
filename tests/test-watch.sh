@@ -120,11 +120,11 @@ scen_events() {
   start_watch DUO_WATCH_STATUS=1 DUO_HEARTBEAT_MINUTES=1 DUO_STALL_MINUTES=1 DUO_STEP_MINUTES=1
   wait_ready
   check 'ready line reports head, requests and no transcript' grep -q " head=$h0 requests=0 transcript=False " <<< "$ready"
-  new_commit wip 'Flow: wip' > /dev/null
+  new_commit wip $'Flow: wip\nFlow: anchored-adapt A-1' > /dev/null
   sleep 4
-  check 'Flow: wip commit does not wake' [ "$(wake_count)" = 0 ]
-  s1=$(new_commit s1 'Flow: step S1')
-  check 'Flow: step commit wakes' wait_line "^DUO_WAKE_t 1 commit $s1\$" 15
+  check 'Flow: wip + anchored-adapt commit does not wake' [ "$(wake_count)" = 0 ]
+  s1=$(new_commit s1 $'Flow: step S1\nFlow: anchored-adapt A-1')
+  check 'Flow: step + anchored-adapt commit wakes' wait_line "^DUO_WAKE_t 1 commit $s1\$" 15
   s2=$(new_commit 'no trailer')
   check 'commit without Flow trailer wakes' wait_line "^DUO_WAKE_t 2 commit $s2\$" 15
   printf 'STATUS: S0-DONE\n\n### R-1 question\n' > "$duo/progress.md"

@@ -4,13 +4,14 @@
 
 ## 读什么
 
-只读下面这些，其余不读：
+flow 目录和 skill 文件只读下面这些，其余不读：
 - 启动时：本文件，以及 flow 目录里的 `handover.md`、`steps.md`、`rulings.md`。
 - 收到开始 S1 或方案升版的指令时：重读 `handover.md`、`steps.md` 和 `rulings.md` 全文。
 - 做某一步时：只读这一步在 `steps.md` 里引用的 `test-plan.md` 用例行和 `problem-and-solutions.md` 小节。读法：先用 Grep 定位，再只读那一节。
+- 读仓库代码时：先看 `steps.md` 这一步贴的代码段，通常够用。不够时先用 Grep 定位，再只读命中的那段，不整读大文件。确要通读（例如梳理调用方）时，按「每一步」第 6 条写 `running`。
 - 第一次写正式测试前：读 `fixing-bugs` 目录 `full.md` 的第 5–6 段，以及它依赖的 `tdd`。
 - 用到锚定断言时：读 `anchored/` 里对应的文件。
-- 定点读、交付和 DoD 撤销时：`batch.md`。
+- 定点读和 DoD 撤销时：`batch.md`。
 - 收尾时：`test-plan.md` 里全部「本轮必做」用例行，读法同上。
 
 你只写两处：任务 worktree 的跟踪文件，和 duo 目录（`progress.md`、`logs/`、`running`）。flow 目录只读。
@@ -26,7 +27,10 @@
 
 ## 边界
 
-- 只在分支 `fix/<短名>` 上工作，不 checkout 别的分支。
+- 只在 `handover.md` 写的工作分支上工作，不 checkout 别的分支。
+- Shell 的工作目录设为任务 worktree，文件工具用绝对路径：你的会话工作区不一定是 worktree。
+- 你只 commit。push、建 MR/PR 和合入都由 A 做。
+- `handover.md`「执行口径」里本项目对你的额外约束（环境变量、能不能联网、commit 规范等）照做。
 - commit 时按路径 `git add`，不用 `git add -A` 或 `git add .`。跑复现或测试时自动生成、项目又没忽略的缓存和编译产物（例如 `__pycache__/`），不提交，也不算打点。下文说 `git status --short` 为空，都是指除了这些生成物以外为空。
 - 不用 `git stash`：stash 栈由全部 worktree 共享。
 - 已 commit 的历史不改写：不 amend、不 rebase、不 reset、不 force push。A 的审查钉在这些 sha 上。
@@ -35,15 +39,13 @@
 
 ## 每次结束本轮
 
-你每次结束本轮，回复的第一行都必须是 `STATUS:` 行，A 靠它决定下一步。即使是中途停下也一样。结束前，把同一行写进 `progress.md` 的 `STATUS:` 行，覆盖旧值。干活中途不改这一行，进度写进「当前步骤」：退路里，监视脚本把这一行的变化当作你停下了。
+你每次结束本轮，回复的第一行都必须是 `STATUS:` 行，A 靠它决定下一步。即使是中途停下也一样。A 只收得到你这一轮的最后一条消息，所以 `STATUS:` 行、证据和没把握的点都写在这一条里。结束前，把同一行写进 `progress.md` 的 `STATUS:` 行，覆盖旧值。干活中途不改这一行，进度写进「当前步骤」：退路里，监视脚本把这一行的变化当作你停下了。
 
 | 状态 | 什么时候用 |
 |---|---|
 | `STATUS: S0-DONE` | S0 做完 |
 | `STATUS: BLOCKED R-<n>` | 全部步骤都被 R-n 阻塞 |
 | `STATUS: DOD` | DoD 达成，格式见「收尾」 |
-| `STATUS: DELIVERED <链接>` | 交付完成 |
-| `STATUS: DELIVER-BLOCKED <缺什么>` | 交付做不了 |
 | `STATUS: STOPPED` | A 要你停手 |
 | `STATUS: PAUSED <原因>` | 其他原因停下，例如工具出错 |
 
@@ -66,15 +68,15 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 方案冻结前，A 只让你做 S0：
 1. 确认 `git status --short` 为空，当前分支正确。
 2. 按本文件末尾的格式，在 duo 目录建 `progress.md`。
-3. 按 `handover.md` 的「依赖」确认依赖已装好。写的是「后台安装中」时，等 `logs/deps.txt` 末行出现 `DEPS_DONE` 再往下做。
+3. 按 `handover.md` 的「依赖」确认依赖：写的是「已就绪」，跑一次它给的自检命令；写的是「后台安装中」，等 `logs/deps.txt` 末行出现 `DEPS_DONE` 再往下做。
 4. 运行 flow 目录 `repro/` 里的原始复现命令，对照 `handover.md` 写的预期失败样子，把输出摘要记进 `progress.md`。不像时照样做完 S0，在 `S0-DONE` 回复里写「复现不符」和实际输出，由 A 判断。
-5. 运行 `steps.md` 中 S0 列出的相关测试套件。修复前就失败的用例记进 `progress.md` 的「基线失败」。
+5. 运行 `steps.md` 中 S0 列出的既有相关测试套件。修复前就失败的用例记进 `progress.md` 的「基线失败」。
 6. S0 不改跟踪文件，也不 commit。第 4、5 步预计超过 2 分钟时，按「每一步」第 6、7 条写 `running`，命令放后台跑。
 7. 做完后，把 `progress.md` 的 `STATUS:` 行写成 `S0-DONE`，结束本轮，回复 `STATUS: S0-DONE`，附复现输出摘要和基线失败清单。
 
 ## 每一步
 
-1. 按 `steps.md` 和 `full.md` 第 5 段做，一次只做一条用例。证明行为改变的用例，先 `red` 再 `green`；验证既有行为的用例可以直接 `green`。每次运行后，在「用例记录」里更新这条用例的状态、命令、输出摘要和日志文件。开始一条用例或一个子步骤时，更新 `progress.md` 的「当前步骤」：A 的监视脚本把 duo 目录里的写入当作你在干活的证据，只读不写超过 10 分钟会被判为卡住。
+1. 按 `steps.md` 和 `full.md` 第 5 段做，一次只做一条用例。证明行为改变的用例，先 `red` 再 `green`；验证既有行为的用例可以直接 `green`。`steps.md` 给用例标了转绿步（例如 `A-1 转绿 S3`）时，它在转绿步之前保持 `red` 是预期的，不算那几步没做完，照常 commit。每次运行后，在「用例记录」里更新这条用例的状态、命令、输出摘要和日志文件。开始一条用例或一个子步骤时，更新 `progress.md` 的「当前步骤」：A 的监视脚本把 duo 目录里的写入当作你在干活的证据，只读不写超过 10 分钟会被判为卡住。
 2. 第一条正式回归测试就是锚定断言 A-1：
    - 把 `anchored/A-1.*` 的文本拷进测试代码，块首写 `ANCHORED id=A-1 begin`，块尾写 `ANCHORED id=A-1 end`，用该语言的注释语法。
    - 带 `CORE` 注释的核心行逐字保留，`CORE` 注释也保留。
@@ -83,7 +85,7 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
    - 先运行它，确认它因为预期的根因失败；再写刚好让它通过的修复。
 3. 每个步骤完成 commit 之前做**定点读**：读 `rulings.md` 和 `batch.md` 里编号在游标之后的新条目，处理适用的条目，更新 `progress.md` 的已读游标。同时确认这一步的用例已经写进「用例记录」：A 被这个 commit 唤醒后，要靠它轻检。
 4. commit 前跑 `git diff --check`，有多余空行或行尾空格就先清掉。仓库文件以 CRLF 存储时改跑 `git -c core.whitespace=cr-at-eol diff --check`，否则每一行都会被报成行尾空格。commit 带 trailer，同时更新 `progress.md`。commit 要小：子步骤做完就提交，中间态用 `Flow: wip`。
-5. 日志只写进 duo 目录的 `logs/`，不写别处。运行日志先用 `rg -n "FAIL|Error|Traceback" <日志>` 定位；命中太多或看不懂，再按「外包」交给子 agent。结论要带证据，写路径加行号或 commit sha。你自己加的诊断输出一律带前缀 `[DEBUG-duo]`，最后一步 commit 前用它搜一遍，删干净。
+5. 日志只写进 duo 目录的 `logs/`，不写别处。运行日志只读命中段，不整读：先用 `rg -n "FAIL|Error|Traceback" <日志>` 定位，再拿这条用例行「可观察结果」里的字面输出当关键字筛一遍。命中太多或看不懂，再按「外包」交给子 agent，给它日志路径和关键字。结论要带证据，写路径加行号或 commit sha。你自己加的诊断输出一律带前缀 `[DEBUG-duo]`，最后一步 commit 前用它搜一遍，删干净。
 6. 预计超过 2 分钟、你要停下等的事（长命令、等子 agent 交回），或预计连续只读超过 5 分钟（例如通读调用方代码），先在 duo 目录写 `running`。它只有一行：`<预计分钟> <在做什么>`。做完立即删掉。A 的监视脚本靠它区分「在跑长命令」和「卡住」；没有它，10 分钟没动静就会被判为卡住。
 7. 预计超过 2 分钟的命令放到后台跑，输出写进 `logs/`，再等它结束。Cursor：Shell 设 `block_until_ms: 0`，再用 AwaitShell 等。A 误判卡住、interrupt 你时，前台命令会被取消，后台命令照常跑完。
 
@@ -97,6 +99,8 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 | `Flow: docs` | 纯文档 |
 | `Flow: anchored-adapt A-<n>` | 锚定断言的机械适配，可和上面几种并存 |
 
+每个 commit 恰好带前四种里的一种。`anchored-adapt` 只是附加：这个 commit 适配过 ANCHORED 块就加上，不能省，也不顶替前四种。别的 `Flow:` 行不写。
+
 ## 外包
 
 宿主能让你开子 agent 时（Cursor 可以），能并行的活交给子 agent，不能并行的你自己串行做。开一个子 agent 本身就要一两分钟，所以只外包你自己做要超过 5 分钟的活，更小的自己做：
@@ -107,7 +111,7 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 | 跑全量测试，判读日志 | 锚定断言和第一条正式回归测试 |
 | | 任何裁决依赖的判断 |
 
-- 每个子 agent 只拿它的用例行、它负责的文件路径和运行命令，交回结果和证据。
+- 每个子 agent 只拿它的用例行、它负责的文件路径和运行命令，交回结论和证据（路径加行号），日志不贴原文。
 - 同一个文件不让两个 agent 同时改。
 - 子 agent 的结果由你核对后统一 commit。
 - 只用前台 Task：几个子 agent 放在同一条消息里发出，一起返回。不用后台子 agent：它的结果要等你结束本轮才送到，而你结束本轮就是回 A 一行 `STATUS:`。
@@ -133,7 +137,7 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 
 ## A 的消息
 
-A 只在下面几种情况下 resume 你：
+A resume 你的情形不止下面这些，完整清单在 A 那边，你不用读。下面几种你这边有特定的做法，其余照消息做：
 1. P0：
    1. 先运行 `git status --short`。有没提交的半步改动时，先把它 commit 成 `Flow: wip`，message 里写「被 P0 打断，未完成」。测试没过也照样提交。
    2. 再修 P0，单独 commit，带 `Flow: fix <发现编号>`。
@@ -141,33 +145,26 @@ A 只在下面几种情况下 resume 你：
 2. 用户确认的流程指令，例如方案升版。按指令做。方案升版时，只重做 `rulings.md` 里写明受影响的步骤。
 3. BLOCKING 答复通知：读 `rulings.md`，继续。
 4. 判你卡住时重发的最后一条指令：按 `progress.md` 和 `git log` 的现状接着做。在等后台长命令时，补写 `running`，接着等同一个 shell。
-5. DoD 撤销：修消息里点名的 `batch.md` 条目，每条单独 commit，带 `Flow: fix <发现编号>`。修完按「收尾」再回一次 `STATUS: DOD`。
+5. DoD 撤销，包括 A 转来的 MR/PR 评审意见：修消息里点名的 `batch.md` 条目，每条单独 commit，带 `Flow: fix <发现编号>`。修完按「收尾」再回一次 `STATUS: DOD`。
 6. 步骤超时：这一步做得太久，用户让 A 打断你。先按第 1 种的第 1 条把半步改动 commit 成 `Flow: wip`，message 写「步骤超时打断，未完成」；再结束本轮，回复 `STATUS: PAUSED 步骤超时：<卡在哪、试过什么、还差什么>`。A 之后 resume 你时，按 `rulings.md` 里新的裁决继续。
+7. 要你停手：先按第 1 种的第 1 条把半步改动 commit 成 `Flow: wip`，message 写「被叫停，未完成」；再结束本轮，回复 `STATUS: STOPPED`。
 
 ## 收尾
 
-DoD 以 `steps.md` 末尾为准。判断「本轮必做全部 green」时，逐条对照 `test-plan.md` 里的本轮必做用例行，「用例记录」里没有 green 的先跑。达成后：
+DoD 以 `steps.md` 末尾为准。判断「本轮必做全部 green」时，逐条对照 `test-plan.md` 里的本轮必做用例行，「用例记录」里没有 green 的先跑。标「执行者：A 验收」的用例由 A 跑，你不跑。达成后：
 1. 清掉你自己加的打点：用 `[DEBUG-duo]` 搜一遍。清理改了跟踪文件的话，作为 `Flow: step S<末>` 提交，并只重跑原始复现；没改就直接往下。
 2. 结束本轮，回复下面这段：
 
 ```text
 STATUS: DOD
 final_sha: <sha>
-必做用例：<n>/<n> green（证据：「用例记录」和 logs/ 里的文件）
+B 跑的必做用例：<n>/<n> green（不含 A 验收的；证据：「用例记录」和 logs/ 里的文件）
+A 验收的用例：<编号，没有写「无」>
 原始复现：通过（<输出摘要>）
 基线失败：<与 S0 相比有无变化>
 ```
 
-A 验收通过后，会用「交付」resume 你：
-1. push 分支。
-2. 向 `handover.md` 里的目标分支建 Draft MR/PR，按项目规范写。描述里写根因、改法、验证、`batch.md` 里的 P1/P2、待拍板项、方案版本。分支上保留 `Flow:` trailer。
-3. 回复 `STATUS: DELIVERED <链接>`。
-
-注意：不合入，也不做等同于批准合入的动作，例如标记 ready、指派会自动合入的审查者。
-
-push 或建 MR/PR 做不了时，把描述草稿写进 `progress.md`，回复 `STATUS: DELIVER-BLOCKED <缺什么>`。
-
-MR/PR 的评审意见由 A 转给你：按 `Flow: fix` 修，修完 push 分支，回复 `STATUS: DELIVERED <链接>`。push 做不了时，回复 `STATUS: DELIVER-BLOCKED <缺什么>`。
+回完 `DOD`，你的活就做完了。A 验收不通过，或 MR/PR 评审要改代码时，会用「DoD 撤销」resume 你。
 
 ## 两个独立聊天的退路
 

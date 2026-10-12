@@ -163,11 +163,11 @@ try {
             Start-Watch $r @('-WatchStatus', '-HeartbeatMinutes', '1', '-StallMinutes', '1', '-StepMinutes', '1')
             $ready = Wait-Ready
             Check ($ready -match " head=$h0 requests=0 transcript=False ") 'ready line reports head, requests and no transcript'
-            New-Commit $r 'wip' 'Flow: wip' | Out-Null
+            New-Commit $r 'wip' "Flow: wip`nFlow: anchored-adapt A-1" | Out-Null
             Start-Sleep -Seconds 4
-            Check ((Get-Wakes).Count -eq 0) 'Flow: wip commit does not wake'
-            $s1 = New-Commit $r 's1' 'Flow: step S1'
-            Check ((Wait-Line "^DUO_WAKE_t 1 commit $s1$" 15) -ge 0) 'Flow: step commit wakes'
+            Check ((Get-Wakes).Count -eq 0) 'Flow: wip + anchored-adapt commit does not wake'
+            $s1 = New-Commit $r 's1' "Flow: step S1`nFlow: anchored-adapt A-1"
+            Check ((Wait-Line "^DUO_WAKE_t 1 commit $s1$" 15) -ge 0) 'Flow: step + anchored-adapt commit wakes'
             $s2 = New-Commit $r 'no trailer'
             Check ((Wait-Line "^DUO_WAKE_t 2 commit $s2$" 15) -ge 0) 'commit without Flow trailer wakes'
             [IO.File]::WriteAllText((Join-Path $r.Duo 'progress.md'), "STATUS: S0-DONE`n`n### R-1 question`n")

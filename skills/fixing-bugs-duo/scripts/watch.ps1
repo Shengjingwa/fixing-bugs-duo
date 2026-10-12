@@ -64,6 +64,9 @@ function Get-StatusLine {
     return ''
 }
 
+# Idle means the last line is Cursor's turn_ended marker. Other hosts'
+# transcripts may never write it, and may grow mid-turn and keep resetting
+# slow, so pass -Transcript only for a Cursor subagent transcript.
 function Get-TranscriptState {
     if (-not $Transcript -or -not (Test-Path -LiteralPath $Transcript)) { return $null }
     $last = Get-Content -LiteralPath $Transcript -Tail 1 -ErrorAction SilentlyContinue
