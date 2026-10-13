@@ -34,7 +34,7 @@ flow 目录和 skill 文件只读下面这些，其余不读：
 - commit 时按路径 `git add`，不用 `git add -A` 或 `git add .`。跑复现或测试时自动生成、项目又没忽略的缓存和编译产物（例如 `__pycache__/`），不提交，也不算打点。下文说 `git status --short` 为空，都是指除了这些生成物以外为空。
 - 不用 `git stash`：stash 栈由全部 worktree 共享。
 - 已 commit 的历史不改写：不 amend、不 rebase、不 reset、不 force push。A 的审查钉在这些 sha 上。
-- 提交身份：worktree 里 `git config user.name` 和 `git config user.email` 都有值，就用仓库配置。缺任何一个，就用 `handover.md` 的「提交身份」，每条 commit 命令加 `-c user.name=<名字> -c user.email=<邮箱>`。两处都没有，回复 `STATUS: PAUSED 没有 git 身份`。不改 git 配置，也不自己编身份。
+- 提交身份以 `handover.md` 的「提交身份」为准。第一次 commit 前运行 `git var GIT_AUTHOR_IDENT` 和 `git var GIT_COMMITTER_IDENT`：名字和邮箱都和 handover 一致，就直接 commit。不一致或报错时，在每条 commit 命令里临时设四个环境变量 `GIT_AUTHOR_NAME`、`GIT_AUTHOR_EMAIL`、`GIT_COMMITTER_NAME`、`GIT_COMMITTER_EMAIL`（`-c user.name` 压不过已有的环境变量）：bash 写在命令前面，例如 `GIT_AUTHOR_NAME=<名字> … git commit …`；PowerShell 先记下原值，设 `$env:` 变量，commit 完恢复。第一次 commit 后用 `git log -1 --format='%an <%ae> | %cn <%ce>'` 核对。handover 没写身份时，回复 `STATUS: PAUSED 没有 git 身份`。不改 git 配置，也不自己编身份。
 - `rulings.md` 里已经裁决的事项不推翻。遇到歧义，先查 `rulings.md` 的预埋区，查不到再按下文「裁决请求」写 R-n。
 
 ## 每次结束本轮
@@ -111,7 +111,7 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 | 跑全量测试，判读日志 | 锚定断言和第一条正式回归测试 |
 | | 任何裁决依赖的判断 |
 
-- 每个子 agent 只拿它的用例行、它负责的文件路径和运行命令，交回结论和证据（路径加行号），日志不贴原文。
+- 每个子 agent 只拿它的用例行、它负责的文件路径和运行命令，交回结论和证据（路径加行号），日志不贴原文。结论写在它的最后一条消息里，宿主只交回这一条。
 - 同一个文件不让两个 agent 同时改。
 - 子 agent 的结果由你核对后统一 commit。
 - 只用前台 Task：几个子 agent 放在同一条消息里发出，一起返回。不用后台子 agent：它的结果要等你结束本轮才送到，而你结束本轮就是回 A 一行 `STATUS:`。

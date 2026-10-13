@@ -5,7 +5,7 @@
 - 会话 A 诊断根因、写方案和测试计划、审查、验收。你只和 A 对话。
 - 会话 B 是 A 在后台开的子 agent。它在独立的 worktree 里按冻结的方案先写失败的测试，再修到通过。
 
-A 盯着 B 的每个 commit 审查。B 遇到歧义，或者同一条测试换了 3 种改法还不通过，就向 A 请求裁决。最后 A 验收、push 分支、建 Draft MR/PR。合入默认由人确认；你明确授权时（例如「MR 能合就合」），A 按项目的合入流程跟到合入。
+A 盯着 B 的每个 commit 审查。B 遇到歧义，或者同一条测试换了 3 种改法还不通过，就向 A 请求裁决。最后 A 验收、push 分支、建 Draft MR/PR，清掉平台自动挂上的 Assignee 和 Reviewers，在报告里逐张问你合不合入。合入默认由人确认；你明确授权时（例如「MR 能合就合」），A 按项目的合入流程跟到合入。
 
 它建在单会话的 [fixing-bugs](https://github.com/Shengjingwa/fixing-bugs) 之上，两个要一起装。大多数 bug 用 `/fixing-bugs` 就够；修复要分多步提交、碰到关键路径，或者你想让一个会话专门盯着另一个会话干活时，用 `/fixing-bugs-duo`。
 
@@ -46,7 +46,7 @@ sequenceDiagram
 
 | 情况 | 做法 |
 |---|---|
-| 快修档（日志直接指向代码） | 按 `fixing-bugs` 单会话修完，不建 worktree |
+| 快修档（日志直接指向代码） | 在 worktree 里按 `fixing-bugs` 的快修单会话修完，交付同豁免；改动碰到关键路径或出过事的模块时，报告里标出来 |
 | 没命中硬条件，并且 ≤2 步，或 ≤4 步且一轮不超过 5 分钟 | 豁免：A 在 worktree 里单会话修完，不开 B。3–4 步的，交付前派 1 个审查 agent 复查 |
 | 其余没命中硬条件、≤8 步的 | 轻量版：只在最后一步做一次全量审查 |
 | >8 步，或命中硬条件 | 全流程：至少每 4 步一个里程碑，每个里程碑做一次全量审查；历史上出过事的判据各写一条锚定断言 |
@@ -70,7 +70,9 @@ flow 仓库自带 git，放交接材料、裁决记录和审查记录，以及�
 
 duo 目录不在工作区里，`git status` 看不到，也不用改 `.gitignore` 或 `info/exclude`。删 worktree 时它会一起删掉，主仓库不留痕迹。
 
-PR 合入或你宣布放弃后，A 删掉 worktree 和本地分支。放弃时，远端分支和 Draft MR/PR 默认保留，A 会问你要不要删。
+交付时，A 在 `registry.md` 的「待收尾」记一行：MR/PR、worktree、分支。合入可能隔几天、换个会话才定，接手的会话照这一行收尾。
+
+PR 合入或你宣布放弃后，A 删掉 worktree 和本地分支，再核对远端分支删了没有：合入机器人常常不删，MR/PR 设了合入后删除源分支、远端分支又正好是 MR/PR 的最后一个 commit 时，A 替它删。放弃时，远端分支和 Draft MR/PR 默认保留，A 会问你要不要删。
 
 ## 进度与卡住
 
@@ -106,13 +108,15 @@ A 交付前，按脚本启动时打出的 pid 停掉监视脚本；重启前也�
 /fixing-bugs-duo 每日事件数报表比原始日志少，复现：py -3 -m events.cli data/sample.jsonl
 ```
 
-也能用来做新功能：现象写成现在缺的行为，复现写成现在会失败的验收命令，根因写成要改的代码位置。一个任务要改几个仓库时，每个仓库单独走一遍，步数少的（例如只改配置）通常由 A 单会话做完。
+开工前，A 先查有没有人已经在修：issue 评论、关联的和同模块还开着的 MR/PR。有就停下告诉你，不建现场。
+
+也能用来做新功能：现象写成现在缺的行为，复现写成现在会失败的验收命令，根因写成要改的代码位置。一个任务要改几个仓库时，每个仓库单独走一遍，步数少的（例如只改配置）通常由 A 单会话做完。一次请求里混着仓库外的记录活（往 issue、wiki 里记事实）时，这部分 A 直接做，报告里单列；仓库里的文档照快修走。写给别的团队的契约或文档，验收看每条事实有没有 A 核对过的出处。结果不确定的 bug（例如模型效果），修好标准写成多遍的通过率。
 
 前提：
 1. 仓库是 git 仓库，能建 worktree，git 版本不低于 2.15（要用 `--no-optional-locks`）。
 2. 宿主能开后台子 agent，并能给运行中的子 agent 发消息。Cursor 可以，它的子 agent 也能再开子 agent。宿主开子 agent 时不给转录路径的（例如 Claude Code），监视脚本不传转录，靠心跳让 A 自己核对。宿主不支持后台子 agent 时，A 把 B 的启动提示词写进文件，请你新开一个聊天粘贴；A 给 B 的指令写进交接文件，由你在 B 的聊天里发一句「继续」。B 在这种方式下卡住时，A 会请你先停掉 B 当前这一轮再发「继续」；还不动，再请你停掉它，新开一个聊天接手。
 3. 宿主能用后台命令的输出唤醒 agent，例如 Cursor Shell 的 `notify_on_output`。
-4. B 的 commit 会进 MR/PR，要用真实的 git 身份。仓库没有配置 `user.name` 和 `user.email` 时，A 会在确认方案时一起问你用哪个身份，不会自己编一个。
+4. B 的 commit 会进 MR/PR，要用真实的 git 身份。A 用 `git var GIT_AUTHOR_IDENT` 查 git 实际会用的身份，环境变量 `GIT_AUTHOR_*` 也算在内，而且优先级高于 `git config` 和 `-c`。查不到时，A 会在确认方案时一起问你用哪个身份，不会自己编一个。
 5. 平台：在 Windows + Cursor 上试跑过。Windows 上监视脚本用 `scripts/watch.ps1`，Windows 自带的 PowerShell 5.1 和 PowerShell 7 都能跑。`scripts/watch.sh` 给 Linux 和 macOS 用，CI 在 Ubuntu 上跑它的测试，macOS 没有测过。
 
 A 会自己判断改动有没有碰到关键路径、是不是落在出过事的模块里，拿不准时才问你。你的答复记进 `registry.md`，同一个仓库下次不再问。
@@ -140,7 +144,7 @@ npx skills add Shengjingwa/fixing-bugs-duo
 
 注意：
 1. 目录名必须和 `SKILL.md` 里的 `name` 一致，即 `fixing-bugs-duo`。
-2. 整个目录一起复制：`fixing-bugs-duo/` 里有 `SKILL.md`、`supervise.md`、`b.md`、`review.md`、`files.md` 和 `scripts/`。快修只读 `SKILL.md`；豁免还会读 `review.md`，你授权合入时再读 `supervise.md` 的「跟到合入」；开了 B 之后，A 才读 `supervise.md` 和 `review.md`，B 只读 `b.md`。
+2. 整个目录一起复制：`fixing-bugs-duo/` 里有 `SKILL.md`、`supervise.md`、`b.md`、`review.md`、`files.md` 和 `scripts/`。快修读 `SKILL.md` 和 `files.md`；豁免还会读 `review.md`，你授权合入时再读 `supervise.md` 的「跟到合入」；开了 B 之后，A 才读 `supervise.md` 和 `review.md`，B 只读 `b.md`。
 3. 在 Cloud Agent 或远程容器里用时，把两个目录放到仓库根目录下的 `.cursor/skills/`。
 4. Cursor 和 Claude Code 读 `SKILL.md` 里的 `disable-model-invocation: true`，只在你输入 `/fixing-bugs-duo` 时调用。
 
