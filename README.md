@@ -70,7 +70,7 @@ flow 仓库自带 git，放交接材料、裁决记录和审查记录，以及�
 
 duo 目录不在工作区里，`git status` 看不到，也不用改 `.gitignore` 或 `info/exclude`。删 worktree 时它会一起删掉，主仓库不留痕迹。
 
-交付时，A 在 `registry.md` 的「待收尾」记一行：MR/PR、worktree、分支。合入可能隔几天、换个会话才定，接手的会话照这一行收尾。
+交付时，A 在 `registry.md` 的「待收尾」记一行：MR/PR、worktree、分支。合入可能隔几天、换个会话才定，接手的会话照这一行收尾。快修和豁免的 MR/PR 收到要改代码的评审意见时，A 也照这一行找到 worktree，自己改、重跑验证、push。
 
 PR 合入或你宣布放弃后，A 删掉 worktree 和本地分支，再核对远端分支删了没有：合入机器人常常不删，MR/PR 设了合入后删除源分支、远端分支又正好是 MR/PR 的最后一个 commit 时，A 替它删。放弃时，远端分支和 Draft MR/PR 默认保留，A 会问你要不要删。
 
@@ -144,7 +144,7 @@ npx skills add Shengjingwa/fixing-bugs-duo
 
 注意：
 1. 目录名必须和 `SKILL.md` 里的 `name` 一致，即 `fixing-bugs-duo`。
-2. 整个目录一起复制：`fixing-bugs-duo/` 里有 `SKILL.md`、`supervise.md`、`b.md`、`review.md`、`files.md` 和 `scripts/`。快修读 `SKILL.md` 和 `files.md`；豁免还会读 `review.md`，你授权合入时再读 `supervise.md` 的「跟到合入」；开了 B 之后，A 才读 `supervise.md` 和 `review.md`，B 只读 `b.md`。
+2. 整个目录一起复制：`fixing-bugs-duo/` 里有 `SKILL.md`、`supervise.md`、`b.md`、`review.md`、`files.md` 和 `scripts/`。快修读 `SKILL.md` 和 `files.md`；豁免还会读 `review.md`；快修和豁免的 MR/PR 收到评审意见时，再读 `supervise.md` 的「MR/PR 评审意见」和 `review.md` 的严重度；你授权合入时再读 `supervise.md` 的「跟到合入」；开了 B 之后，A 才读 `supervise.md` 和 `review.md`，B 只读 `b.md`。
 3. 在 Cloud Agent 或远程容器里用时，把两个目录放到仓库根目录下的 `.cursor/skills/`。
 4. Cursor 和 Claude Code 读 `SKILL.md` 里的 `disable-model-invocation: true`，只在你输入 `/fixing-bugs-duo` 时调用。
 
