@@ -27,11 +27,11 @@
 |---|---|
 | `S0-DONE` | 核对复现输出确实像 `handover.md` 写的那样失败，复现不符预期就回第 3 步。基线失败写进 `test-plan.md`。用户已确认方案，就按 SKILL.md 第 6 步冻结并 resume B；还没确认就等 |
 | `BLOCKED R-<n>` | 按 `request` 行处理，答复后 resume B |
-| `PAUSED <原因>` | 按原因处理。缺提交身份时问用户，写进 `handover.md` 后 resume B。`步骤超时：…` 按下文「步骤超时」的「打断 B」处理 |
+| `PAUSED <原因>` | 按原因处理。缺提交身份时问用户，写进 `handover.md` 后 resume B。`步骤超时：…` 按下文「步骤超时」的「打断 B」处理。原因写的是还在做（例如「S2 进行中」）时，是 B 干活中途改了状态行：退路里的 `status` 事件读到它、行末又没有 `@<时:分:秒>`，B 并没有停，不处理；B 确实结束了本轮的，resume B，要它按现状接着做 |
 | `STOPPED` | 进入下面的换 B |
 | `DOD` | 进入第 8 步。MR/PR 已经建好时（转达评审意见那一轮），按第 8 步「MR/PR 评审意见」收尾，不再走第 8 步第 1–4 条 |
 
-- **P0**：先落盘，再 resume B 并设 `interrupt: true`，消息写发现编号和证据。P1、P2 不发消息，写进 `batch.md`，靠 B 的定点读送达；B 已过最后一次定点读时，按第 8 步撤销 DoD 送达。
+- **P0**：先落盘，再 resume B 并设 `interrupt: true`，消息写发现编号和证据。P1、P2 不发消息，写进 `batch.md`，靠 B 的定点读送达；B 已过最后一次定点读时，按第 8 步撤销 DoD 送达。最后一步已经 commit、`progress.md` 的已读游标又没读到这一条，就是已过。
 - **resume B**：ID 从 `handover.md` 读，不凭记忆：A 压缩后，摘要里常常只剩 ID 前缀。A 只在这几种情况下 resume B：P0、流程指令（开始 S1、DoD 撤销、用户确认的升版；转达 MR/PR 评审意见也走 DoD 撤销）、BLOCKING 答复通知、处理完 `PAUSED` 的原因后让它继续（例如补好提交身份）、判卡住时重发的最后一条指令、步骤超时时用户要打断它（以及打断后让它继续）、要它补 `STATUS:` 行、要它停手。这是完整清单，b.md「A 的消息」只展开 B 那边有特定做法的几种。
 - **要用户拍板的事**：推翻勿翻案项、改变方案行为、P1 遗留放行、同一问题 3 轮修不好、同一步第二次步骤超时、B 对裁决有异议且 A 复核后仍分歧。A 去问用户，B 先做不受影响的步骤。用户拍板改方案时，按 files.md 的升版规程走。用户没回应时，在 `handover.md` 标「待用户」；全部步骤被阻塞时暂停任务，A 和 B 都不得自行裁决。
 - **换 B**：`progress.md` 的压缩日志显示连续 3 个压缩间隔都短于 30 分钟，且剩余步骤 ≥ 3 时，A 建议用户换 B。用户同意后，宿主若仍显示旧 B 在跑，A 先 interrupt 旧 B，要它停手并回复 `STATUS: STOPPED`；收不到这条回复，就报给用户，不开新 B，免得两个 B 同时写 worktree。旧 B 停下后，A 用 SKILL.md 第 5 步的提示词和 `handover.md` 里记的模型新开一个 B（「本轮」写成「接着 progress.md 的当前步骤继续」），把新 ID 和转录写进 `handover.md`，再按 SKILL.md 第 5 步「停和重启脚本」用新转录重启。B 出错退出时，同样新开一个 B 接上。退路里，请用户先停掉旧 B 的聊天；A 把 `b-prompt.md` 的「本轮」改成同样的话，commit，再请用户新开一个聊天粘贴它，监视脚本不用重启。
@@ -90,10 +90,10 @@ A 在自己的对话里汇报，每次一行，格式固定：
 ## 8. 终审、验收与交付
 
 1. 按 review.md 终审：最后一个 `[M]` 的全量审查要审整个任务区间，它兼作终审，不再另做一轮。终审时还要复读 `batch.md` 里的全部驳回项。
-2. **独立验收**：开始前先查 `batch.md`，还有 `open` 的 P1 就按第 3 条下的做法撤销 DoD，不做验收。B 停着时，A 在任务 worktree 的最终 sha 上亲手重跑两类命令：未缩小的原始复现命令，以及 `test-plan.md` 里全部本轮必做用例，包括标「执行者：A 验收」的。不通过的用例按 review.md 定级，写进 `batch.md`。输出写回 `test-plan.md`，同时把 `progress.md`「用例记录」整表一次转抄进 `test-plan.md`，commit。B 的回报不能代替这一步。B 交回 `STATUS: DOD` 时终审 agent 还在跑，也不用等，直接开始验收；慢命令放后台跑，同时核对 DoD 的其他条目。
+2. **独立验收**：开始前先查 `batch.md`，还有 `open` 的 P1 就按第 3 条下的做法撤销 DoD，不做验收。没有，就先按 SKILL.md「交付前同步」处理目标分支的新 commit。B 停着时，A 在任务 worktree 的最终 sha 上亲手重跑两类命令：未缩小的原始复现命令，以及 `test-plan.md` 里全部本轮必做用例，包括标「执行者：A 验收」的。不通过的用例按 review.md 定级，写进 `batch.md`。输出写回 `test-plan.md`，同时把 `progress.md`「用例记录」整表一次转抄进 `test-plan.md`，commit。B 的回报不能代替这一步。B 交回 `STATUS: DOD` 时终审 agent 还在跑、目标分支又没动过，也不用等，直接开始验收；要变基的，等终审交回再变基。慢命令放后台跑，同时核对 DoD 的其他条目。
 3. 逐条核对 `steps.md` 末尾的 DoD，那是 DoD 的唯一定义。
 
-   终审或验收发现 P0，或 `batch.md` 里还有 `open` 的 P1 时，DoD 撤销：先落盘，再 resume B「DoD 撤销」，消息列出这些发现编号，回到第 7 步。
+   终审或验收发现 P0，或 `batch.md` 里还有 `open` 的 P1 时，DoD 撤销：先落盘，再 resume B「DoD 撤销」，消息列出这些发现编号，回到第 7 步。会进 MR/PR diff、多半会引来评审意见的 P2（例如重复的段落、同一处措辞只改了一半），可以一起列进去；没有 P0、P1 时，也可以只为这类 P2 撤销 DoD：交付后的评审意见往往要多一轮评审，有的项目还要重新变基、重审，比现在让 B 修贵。只影响描述的 P2 照旧写进 MR/PR 描述。
 4. 通过后由 A 交付，B 停着不动：
    1. 停掉监视脚本，把 `handover.md` 的「监视脚本 PID」改成「已停」，commit。
    2. push 工作分支：`git -C <worktree> push -u <远端> <工作分支>`，`<远端>` 见 SKILL.md 第 2 步。
@@ -101,12 +101,19 @@ A 在自己的对话里汇报，每次一行，格式固定：
    4. 按 SKILL.md「交付报告」报告。push 或建 MR/PR 做不了时，把描述草稿写进 flow 的 `<短名>/`，报告里写明缺什么。
 
 **MR/PR 评审意见**：A 先按 review.md 的严重度定级。
-- 要改代码的：写进 `batch.md`，按 SKILL.md 第 5 步「停和重启脚本」起脚本，再用「DoD 撤销」resume B。B 修完回 `DOD` 后，A 亲验 `last_reviewed_sha` 之后的 fix commit，把受影响用例的新结果补进 `test-plan.md`，commit flow 仓库。通过后停脚本（`handover.md` 再写「已停」），运行 `git -C <worktree> push`（MR/PR 已在，不再建），按 SKILL.md「交付报告」报告；不通过就再交给 B。
+- 要改代码的：写进 `batch.md`。远端分支有本地没有的 commit 时（评审人在网页上应用了建议，或平台变基过），A 先按 SKILL.md「快修和豁免的 MR/PR 评审意见」第 2 条把 worktree 跟上去。再按 SKILL.md 第 5 步「停和重启脚本」起脚本，用「DoD 撤销」resume B，跟过远端的在消息里写明分支已到哪个 sha。B 修完回 `DOD` 后，A 亲验 `last_reviewed_sha` 之后的 fix commit，把受影响用例的新结果补进 `test-plan.md`，commit flow 仓库。通过后停脚本（`handover.md` 再写「已停」），运行 `git -C <worktree> push`（MR/PR 已在，不再建），按 SKILL.md「交付报告」报告；不通过就再交给 B。
 - 不改代码就能回应的（解释、配置、上线后核对）：A 直接回复评审人。
 - P2 可以留给后续 MR/PR：写进 `batch.md`，并告诉评审人。
 - 意见触及方案行为时，问用户。
 
-**跟到合入**：只在用户授权合入时做，见 SKILL.md「交付报告」。A 按项目的合入流程走。改 MR/PR 的状态或审查者前，先确认 push 的退出码是 0、MR/PR 的 head 等于 worktree 的 HEAD，再单独执行，不和 push 串在一条命令里。平台合入前变基了分支时，先 fetch，再对变基前后的 head 各跑一次 `git diff --numstat <远端>/<目标分支>...<head>`，逐文件改动有出入就看清再放行。
+**跟到合入**：只在用户授权合入时做，见 SKILL.md「交付报告」。A 按项目的合入流程走。改 MR/PR 的状态或审查者前，先确认 push 的退出码是 0、MR/PR 的 head 等于 worktree 的 HEAD，再单独执行，不和 push 串在一条命令里。平台合入前变基了分支时，先 fetch，再对变基前后的 head 各跑一次 `git diff --numstat <远端>/<目标分支>...<head>`，逐文件改动有出入就看清再放行；`.gitattributes` 里按 `merge=union` 合并的文件（例如 CHANGELOG）行数一致也可能放错了位置，逐个看 diff。开了 B 的任务，放行后把 `review-state.md` 的 `last_reviewed_sha` 改成变基后的 head，注明「平台变基自 <旧 sha>」，commit flow 仓库，免得下一轮评审意见把上游的 commit 也当成要亲验的。
+
+变基（平台做的，或 A 按项目合入流程做的）弄坏了合并类文件时，例如 union 合并的 CHANGELOG 多出别的 MR/PR 的小节、生成文档出现重复段，A 自己在 worktree 里修，不交 B：
+1. B 停着。本地还没跟上远端时，按 SKILL.md「快修和豁免的 MR/PR 评审意见」第 2 条跟到 MR/PR 现在的 head。
+2. 修完另 commit，说明里写原因。开了 B 的任务带 `Flow: docs`，提交身份用 `handover.md` 的「提交身份」，和 `git var` 打出的不同时按 b.md「边界」的写法；快修和豁免的身份照 SKILL.md 那一节第 3 条。
+3. push 前，`git -C <worktree> diff --numstat <远端>/<目标分支>...HEAD` 要和 `git -C <worktree> diff --numstat <远端>/<目标分支>...<变基前的 head>` 逐文件一致。开了 B 的任务，push 后同样把 `last_reviewed_sha` 改成新 HEAD；之后再 resume B 时，消息里写明分支已到哪个 sha。
+
+只限这类文件，别的改动照「MR/PR 评审意见」交 B。
 
 MR/PR 合入或用户宣布放弃后，做 SKILL.md 第 9 步。
 
