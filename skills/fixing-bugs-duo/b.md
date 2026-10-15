@@ -33,6 +33,7 @@ flow 目录和 skill 文件只读下面这些，其余不读：
 - `handover.md`「执行口径」里本项目对你的额外约束（环境变量、能不能联网、commit 规范等）照做。
 - commit 时按路径 `git add`，不用 `git add -A` 或 `git add .`。跑复现或测试时自动生成、项目又没忽略的缓存和编译产物（例如 `__pycache__/`），不提交，也不算打点。下文说 `git status --short` 为空，都是指除了这些生成物以外为空。
 - 不用 `git stash`：stash 栈由全部 worktree 共享。
+- 构建或跑测试缺不入仓的文件（例如被 gitignore 的二进制）时，不去主仓库拷，回 `STATUS: PAUSED 缺不入仓文件：<路径>`。
 - 已 commit 的历史不改写：不 amend、不 rebase、不 reset、不 force push。A 的审查钉在这些 sha 上。
 - 提交身份以 `handover.md` 的「提交身份」为准。第一次 commit 前运行 `git var GIT_AUTHOR_IDENT` 和 `git var GIT_COMMITTER_IDENT`：名字和邮箱都和 handover 一致，就直接 commit。不一致或报错时，在每条 commit 命令里临时设四个环境变量 `GIT_AUTHOR_NAME`、`GIT_AUTHOR_EMAIL`、`GIT_COMMITTER_NAME`、`GIT_COMMITTER_EMAIL`（`-c user.name` 压不过已有的环境变量）：bash 写在命令前面，例如 `GIT_AUTHOR_NAME=<名字> … git commit …`；PowerShell 先记下原值，设 `$env:` 变量，commit 完恢复。第一次 commit 后用 `git log -1 --format='%an <%ae> | %cn <%ce>'` 核对。handover 没写身份时，回复 `STATUS: PAUSED 没有 git 身份`。不改 git 配置，也不自己编身份。
 - `rulings.md` 里已经裁决的事项不推翻。遇到歧义，先查 `rulings.md` 的预埋区，查不到再按下文「裁决请求」写 R-n。
@@ -70,7 +71,7 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
 2. 按本文件末尾的格式，在 duo 目录建 `progress.md`。
 3. 按 `handover.md` 的「依赖」确认依赖：写的是「已就绪」，跑一次它给的自检命令；写的是「后台安装中」，等 `logs/deps.txt` 末行出现 `DEPS_DONE` 再往下做。
 4. 运行 flow 目录 `repro/` 里的原始复现命令，对照 `handover.md` 写的预期失败样子，把输出摘要记进 `progress.md`。不像时照样做完 S0，在 `S0-DONE` 回复里写「复现不符」和实际输出，由 A 判断。
-5. 运行 `steps.md` 中 S0 列出的既有相关测试套件。修复前就失败的用例记进 `progress.md` 的「基线失败」。
+5. 运行 `steps.md` 中 S0 列出的既有相关测试套件。修复前就失败的用例记进 `progress.md` 的「基线失败」，没有就写「无」。
 6. S0 不改跟踪文件，也不 commit。第 4、5 步预计超过 2 分钟时，按「每一步」第 6、7 条写 `running`，命令放后台跑。
 7. 做完后，把 `progress.md` 的 `STATUS:` 行写成 `S0-DONE`，结束本轮，回复 `STATUS: S0-DONE`，附复现输出摘要和基线失败清单。
 
@@ -196,3 +197,5 @@ A 验收的用例：<编号，没有写「无」>
 
 ## 压缩日志
 ```
+
+「用例记录」的行只加在这张表里。每个 `## ` 小标题单独占一行，前面空一行：A 验收时按行首的 `## ` 切出这张表。

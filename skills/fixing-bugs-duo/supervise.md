@@ -8,18 +8,18 @@
 
 每次被唤醒，读出上次处理过的序号之后的全部唤醒行，逐行按下表处理。同一次轮询可能出好几行，例如 `stall` 和 `slow`。
 
-在 Cursor 里，通知要等 A 这一轮结束才送到。A 在一轮里做别的长活时（例如同时管另一个 duo 任务、跑长评测），每做完一段、切换任务之前，读一次监视脚本的输出（Cursor：它的终端文件），按序号补处理新行。不然 B 的 BLOCKING 请求会白等。
+在 Cursor 里，通知要等 A 这一轮结束才送到。A 在一轮里做别的长活时（例如同时管另一个 duo 任务、跑长评测），每做完一段、切换任务之前，读一次监视脚本的输出（Cursor：它的终端文件），按序号补处理新行。不然 B 的 BLOCKING 请求会白等。B 结束本轮的通知也一样晚到，这时按 SKILL.md「现场」看 B 的转录末行。
 
 | 来源 | 做法 |
 |---|---|
-| `commit` | B 有带 `Flow: step`、`Flow: fix` 或没有 trailer 的新 commit。`wip` 和 `docs` 不唤醒 A，留到下次醒来一起处理。对 `review-state.md` 里 `last_reviewed_sha` 之后的每个 commit，按 review.md 的触发分级处理 |
+| `commit` | B 有带 `Flow: step`、`Flow: fix` 或没有 trailer 的新 commit。`wip` 和 `docs` 不唤醒 A，留到下次醒来一起处理。唤醒行只带轮询时的最新 sha，同一次轮询里的几个 commit 只出一行，所以按 `git --no-optional-locks -C <worktree> log --reverse <last_reviewed_sha>..HEAD` 逐个看，每个按 review.md 的触发分级处理 |
 | `request` | `progress.md` 出现新的 `### R-` 标题。读新增的 R-n，在 `rulings.md` 追加答复。B 结束本轮在等时，resume B；B 在跑时不打扰，B 会在下一个定点读到。B 报改法上限的 R-n，说明根因或方案可能不对：A 读 B 存在 `logs/` 里的 diff 和失败输出，在临时 worktree 里重新核对根因；要改方案，按 files.md 的升版规程问用户 |
 | `stall` | B 本该在干活，但 10 分钟没有任何动静，也没有未超时的 `running` 标记。按下文「卡住」处理 |
 | `slow <分钟>` | B 在干活，但离上一个唤醒 A 的 commit 或 B 这一轮开始，已过了 `handover.md` 的「步骤超时」，之后每过一个步骤超时再报一次；`running` 标记不影响它。按下文「步骤超时」处理 |
 | `status`（只在退路里有） | `progress.md` 的 `STATUS:` 行变了，处理同下面「B 本轮结束」 |
 | `DUO_ERROR_` 行，或宿主报告脚本退出 | 监视脚本停了，或者宿主以为它停了。按错误原因修好，按 SKILL.md 第 5 步「停和重启脚本」重启 |
 | `heartbeat`（只在不传转录时有） | 拍快照：`git --no-optional-locks log` 和 `progress.md`。B 本该在干活，且连续两次心跳都没有新 commit、新 R-n 或 `STATUS:` 变化时，再按「卡住」第 2、3 条核对 duo 目录和 `running`。都成立就算卡住：B 是 A 的子 agent 时，按「卡住」的「确认卡住后」处理；退路里按「卡住」末尾的退路做法处理。再按「步骤超时」末段核对这一步做了多久 |
-| B 本轮结束 | 读 B 的 `STATUS:` 行，按下表办。B 每结束一轮处理一次，`STATUS:` 和上一轮相同也照办，例如 DoD 撤销后再回的 `DOD`。回复里没有 `STATUS:` 行时，先读 `progress.md` 的 `STATUS:`；那里也是旧值，才 resume B 要它按现状补一行 |
+| B 本轮结束 | 读 B 的 `STATUS:` 行，按下表办。B 每结束一轮处理一次，`STATUS:` 和上一轮相同也照办，例如 DoD 撤销后再回的 `DOD`。回复里没有 `STATUS:` 行时，先读 `progress.md` 的 `STATUS:`；那里也是旧值，才 resume B 要它按现状补一行。A 按转录末行判 B 结束本轮时，B 的回复从转录里读；之后宿主的通知送到，它带的回复 A 已经读过，或者转录末行已不是 `"type":"turn_ended"`（B 在跑下一轮），就不再处理 |
 
 `STATUS:` 的处理：
 
@@ -27,7 +27,7 @@
 |---|---|
 | `S0-DONE` | 核对复现输出确实像 `handover.md` 写的那样失败，复现不符预期就回第 3 步。基线失败写进 `test-plan.md`。用户已确认方案，就按 SKILL.md 第 6 步冻结并 resume B；还没确认就等 |
 | `BLOCKED R-<n>` | 按 `request` 行处理，答复后 resume B |
-| `PAUSED <原因>` | 按原因处理。缺提交身份时问用户，写进 `handover.md` 后 resume B。`步骤超时：…` 按下文「步骤超时」的「打断 B」处理。原因写的是还在做（例如「S2 进行中」）时，是 B 干活中途改了状态行：退路里的 `status` 事件读到它、行末又没有 `@<时:分:秒>`，B 并没有停，不处理；B 确实结束了本轮的，resume B，要它按现状接着做 |
+| `PAUSED <原因>` | 按原因处理。缺提交身份时问用户，写进 `handover.md` 后 resume B。缺不入仓的文件时，A 照 SKILL.md 第 2 步第 4 条补齐，写进 `handover.md` 的「依赖」，再 resume B。`步骤超时：…` 按下文「步骤超时」的「打断 B」处理。原因写的是还在做（例如「S2 进行中」）时，是 B 干活中途改了状态行：退路里的 `status` 事件读到它、行末又没有 `@<时:分:秒>`，B 并没有停，不处理；B 确实结束了本轮的，resume B，要它按现状接着做 |
 | `STOPPED` | 进入下面的换 B |
 | `DOD` | 进入第 8 步。MR/PR 已经建好时（转达评审意见那一轮），按第 8 步「MR/PR 评审意见」收尾，不再走第 8 步第 1–4 条 |
 
@@ -90,7 +90,7 @@ A 在自己的对话里汇报，每次一行，格式固定：
 ## 8. 终审、验收与交付
 
 1. 按 review.md 终审：最后一个 `[M]` 的全量审查要审整个任务区间，它兼作终审，不再另做一轮。终审时还要复读 `batch.md` 里的全部驳回项。
-2. **独立验收**：开始前先查 `batch.md`，还有 `open` 的 P1 就按第 3 条下的做法撤销 DoD，不做验收。没有，就先按 SKILL.md「交付前同步」处理目标分支的新 commit。B 停着时，A 在任务 worktree 的最终 sha 上亲手重跑两类命令：未缩小的原始复现命令，以及 `test-plan.md` 里全部本轮必做用例，包括标「执行者：A 验收」的。不通过的用例按 review.md 定级，写进 `batch.md`。输出写回 `test-plan.md`，同时把 `progress.md`「用例记录」整表一次转抄进 `test-plan.md`，commit。B 的回报不能代替这一步。B 交回 `STATUS: DOD` 时终审 agent 还在跑、目标分支又没动过，也不用等，直接开始验收；要变基的，等终审交回再变基。慢命令放后台跑，同时核对 DoD 的其他条目。
+2. **独立验收**：开始前先查 `batch.md`，还有 `open` 的 P1 就按第 3 条下的做法撤销 DoD，不做验收。没有，就先按 SKILL.md「交付前同步」处理目标分支的新 commit。B 停着时，A 在任务 worktree 的最终 sha 上亲手重跑两类命令：未缩小的原始复现命令，以及 `test-plan.md` 里全部本轮必做用例，包括标「执行者：A 验收」的。不通过的用例按 review.md 定级，写进 `batch.md`。输出写回 `test-plan.md`，同时把 `progress.md`「用例记录」一次转抄进 `test-plan.md`：取这一节里所有以 `|` 开头的行，直到下一个行首的 `## `。转抄后核对：不标「执行者：A 验收」的每条本轮必做用例，在转抄过来的行里都有 green 记录；缺的先按用例编号在 `progress.md` 全文里找，B 写错了位置的一并转抄。再 commit。B 的回报不能代替这一步。B 交回 `STATUS: DOD` 时终审 agent 还在跑、目标分支又没动过，也不用等，直接开始验收；要变基的，等终审交回再变基。慢命令放后台跑，同时核对 DoD 的其他条目。
 3. 逐条核对 `steps.md` 末尾的 DoD，那是 DoD 的唯一定义。
 
    终审或验收发现 P0，或 `batch.md` 里还有 `open` 的 P1 时，DoD 撤销：先落盘，再 resume B「DoD 撤销」，消息列出这些发现编号，回到第 7 步。会进 MR/PR diff、多半会引来评审意见的 P2（例如重复的段落、同一处措辞只改了一半），可以一起列进去；没有 P0、P1 时，也可以只为这类 P2 撤销 DoD：交付后的评审意见往往要多一轮评审，有的项目还要重新变基、重审，比现在让 B 修贵。只影响描述的 P2 照旧写进 MR/PR 描述。
