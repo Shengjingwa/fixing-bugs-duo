@@ -3,14 +3,15 @@
 flow 仓库只有 A 写，B 只读。每次写入后立即 commit。
 
 同一仓库同时修几个 bug 时，不论是几个 A，还是一个 A 同时管几个任务，都共用这个 flow 仓库：
-- 只 `git add` 自己的 `<短名>/`、`registry.md` 和自己写的分拣表，不用 `git add -A`。一个 A 管几个任务时，按任务分别 add、分别 commit。
+- 只 `git add` 自己的 `<短名>/`、`total-<短名>/`、`registry.md`，以及自己写的或本任务所在的分拣表，不用 `git add -A`。一个 A 管几个任务时，按任务分别 add、分别 commit。
 - `registry.md` 只追加，不重排、不改别人写的行。「待收尾」的行例外：本任务的会话改自己那一行（交付时填 MR/PR 和档位，排队时备注排在谁后面，收尾没做完时写备注），做第 9 步的会话删掉它。
 - 碰到 `index.lock` 报错，等几秒再试。
 
 ```text
 <父目录>/<repo>-flow/
   registry.md              跨任务登记表
-  triage-<日期>.md         一次请求有好几个问题时的分拣表
+  triage-<日期>.md         一次请求有好几个问题，或一个 bug 拆成几个任务时的分拣表
+  total-<短名>/            一个 bug 拆成几个任务时的总验收复现，第 9 步跑
   <短名>/
     handover.md            现状快照
     steps.md               执行顺序与 DoD
