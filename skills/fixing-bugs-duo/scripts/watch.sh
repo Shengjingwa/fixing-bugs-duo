@@ -18,6 +18,10 @@ git_dir=$(git --no-optional-locks -C "$wt" rev-parse --absolute-git-dir 2>/dev/n
   exit 1
 }
 duo="$git_dir/duo"
+if [ ! -d "$duo" ]; then
+  echo "DUO_ERROR_${tag} duo directory missing: $duo"
+  exit 1
+fi
 progress="$duo/progress.md"
 running="$duo/running"
 seq=0
@@ -113,7 +117,7 @@ stall_reported=0
 # new turn, for step_min minutes; repeated every step_min. Ignores duo/running.
 step_at=$last
 slow_at=$step_min
-echo "DUO_READY_${tag} pid=$$ head=${head} requests=${requests} transcript=$([ "$tlen" != -1 ] && echo True || echo False) duo=${duo}"
+echo "DUO_READY_${tag} pid=$$ head=${head} requests=${requests} transcript=$([ "$tlen" != -1 ] && echo True || echo False) idle=$([ "$was_idle" = 1 ] && echo True || echo False) duo=${duo}"
 
 while true; do
   sleep "$poll"
@@ -159,6 +163,9 @@ while true; do
       active_at=$now
       stall_reported=0
       grew=1
+    fi
+    if [ "$idle" = 1 ] && { [ "$was_idle" = 0 ] || [ "$grew" = 1 ]; }; then
+      wake idle
     fi
     # A resume appends A's message at once, so B started a new turn when
     # the transcript grew or stopped ending in turn_ended.

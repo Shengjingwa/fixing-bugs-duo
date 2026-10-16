@@ -156,6 +156,14 @@ try {
             $code = $LASTEXITCODE
             Check ("$out" -like 'DUO_ERROR_t not a git worktree*') "error line: $out"
             Check ($code -eq 1) "exit code 1 (got $code)"
+            $noDuo = Join-Path $Root 'no-duo'
+            New-Item -ItemType Directory -Path $noDuo | Out-Null
+            Invoke-Git -C $noDuo init -q | Out-Null
+            $ErrorActionPreference = 'Continue'
+            $out2 = & $exe -NoProfile -ExecutionPolicy Bypass -File $watch -Worktree $noDuo -Tag t 2>&1
+            $code2 = $LASTEXITCODE
+            Check ("$out2" -like 'DUO_ERROR_t duo directory missing:*') "missing duo error line: $out2"
+            Check ($code2 -eq 1) "missing duo exit code 1 (got $code2)"
         }
         'events' {
             $r = New-Worktree
@@ -204,7 +212,8 @@ try {
             $r = New-Worktree
             $tr = New-Transcript $r $true
             Start-Watch $r @('-Transcript', (Quote $tr), '-StallMinutes', '1', '-HeartbeatMinutes', '1', '-StepMinutes', '1')
-            Wait-Ready | Out-Null
+            $ready = Wait-Ready
+            Check ($ready -match ' transcript=True idle=True ') 'ready line reports initial idle state'
             Set-Quiet $r
             Start-Sleep -Seconds 80
             $wakes = Get-Wakes
@@ -269,12 +278,13 @@ try {
             Wait-Ready | Out-Null
             Check ((Wait-Line '^DUO_WAKE_t 1 slow 1$' 90) -ge 0) 'slow 1 during the first turn'
             [IO.File]::AppendAllText($tr, '{"type":"turn_ended","status":"success"}' + "`n")
+            Check ((Wait-Line '^DUO_WAKE_t 2 idle$' 15) -ge 0) 'turn_ended wakes with idle'
             Start-Sleep -Seconds 70
             $wakes = Get-Wakes
-            Check ($wakes.Count -eq 1) "no slow while B is idle: $($wakes -join ', ')"
+            Check ($wakes.Count -eq 2) "no slow while B is idle: $($wakes -join ', ')"
             [IO.File]::AppendAllText($tr, '{"role":"user","message":{"content":[{"type":"text","text":"next"}]}}' + "`n")
             $resumed = Get-Elapsed
-            $at = Wait-Line '^DUO_WAKE_t 2 slow 1$' 100
+            $at = Wait-Line '^DUO_WAKE_t 3 slow 1$' 100
             $gap = $at - $resumed
             Check ($at -ge 0 -and $gap -ge 55 -and $gap -lt 85) "a new turn restarts the timer and its minutes (slow 1 $([int]$gap)s after it): $((Get-Wakes) -join ', ')"
         }

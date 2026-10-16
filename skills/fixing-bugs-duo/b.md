@@ -11,7 +11,7 @@ flow 目录和 skill 文件只读下面这些，其余不读：
 - 读仓库代码时：先看 `steps.md` 这一步贴的代码段，通常够用。不够时先用 Grep 定位，再只读命中的那段，不整读大文件。确要通读（例如梳理调用方）时，按「每一步」第 6 条写 `running`。
 - 第一次写正式测试前：读 `fixing-bugs` 目录 `full.md` 的第 5–6 段，以及它依赖的 `tdd`。
 - 用到锚定断言时：读 `anchored/` 里对应的文件。
-- 定点读和 DoD 撤销时：`batch.md`。
+- 定点读和 DoD 撤销时：`batch.md`；任务有中间 `[M]` 步、开始最后一步前：`review-state.md`。
 - 收尾时：`test-plan.md` 里全部「本轮必做」用例行，读法同上。
 
 你只写两处：任务 worktree 的跟踪文件，和 duo 目录（`progress.md`、`logs/`、`running`）。flow 目录只读。
@@ -35,7 +35,7 @@ flow 目录和 skill 文件只读下面这些，其余不读：
 - 不用 `git stash`：stash 栈由全部 worktree 共享。
 - 构建或跑测试缺不入仓的文件（例如被 gitignore 的二进制）时，不去主仓库拷，回 `STATUS: PAUSED 缺不入仓文件：<路径>`。
 - 已 commit 的历史不改写：不 amend、不 rebase、不 reset、不 force push。A 的审查钉在这些 sha 上。
-- 提交身份以 `handover.md` 的「提交身份」为准。第一次 commit 前运行 `git var GIT_AUTHOR_IDENT` 和 `git var GIT_COMMITTER_IDENT`：名字和邮箱都和 handover 一致，就直接 commit。不一致或报错时，在每条 commit 命令里临时设四个环境变量 `GIT_AUTHOR_NAME`、`GIT_AUTHOR_EMAIL`、`GIT_COMMITTER_NAME`、`GIT_COMMITTER_EMAIL`（`-c user.name` 压不过已有的环境变量）：bash 写在命令前面，例如 `GIT_AUTHOR_NAME=<名字> … git commit …`；PowerShell 先记下原值，设 `$env:` 变量，commit 完恢复。第一次 commit 后用 `git log -1 --format='%an <%ae> | %cn <%ce>'` 核对。handover 没写身份时，回复 `STATUS: PAUSED 没有 git 身份`。不改 git 配置，也不自己编身份。
+- 提交身份以 `handover.md` 的「提交身份」为准。第一次 commit 前运行 `git var GIT_AUTHOR_IDENT` 和 `git var GIT_COMMITTER_IDENT`：名字和邮箱都和 handover 一致，就直接 commit。不一致或报错时，在每条 commit 命令里临时设四个环境变量 `GIT_AUTHOR_NAME`、`GIT_AUTHOR_EMAIL`、`GIT_COMMITTER_NAME`、`GIT_COMMITTER_EMAIL`（`-c user.name` 压不过已有的环境变量）：bash 写在命令前面，例如 `GIT_AUTHOR_NAME=<名字> … git commit …`；PowerShell 先记下原值，设 `$env:` 变量，commit 完恢复。第一次 commit 后用 `git log -1 --format='%an <%ae> | %cn <%ce>'` 核对。handover 没写身份时，回复 `STATUS: PAUSED 没有 git 身份`。不改 git 配置，也不自己编身份。目标仓库禁止 `Co-authored-by` 等宿主自动追加的 trailer 时（见 `handover.md`「执行口径」），用 Python `subprocess.run(["git", "commit", ...])` 提交；若仍被宿主加上，不 amend，留给 A 交付前统一清理。
 - `rulings.md` 里已经裁决的事项不推翻。遇到歧义，先查 `rulings.md` 的预埋区，查不到再按下文「裁决请求」写 R-n。
 
 ## 每次结束本轮
@@ -84,7 +84,7 @@ A resume 你、上下文还完整时，不算冷启动。冷启动时：
    - 核心行以外的改动是机械适配，可以自己做，例如 import、夹具名、语法、缩进。commit trailer 加 `Flow: anchored-adapt A-1`。
    - 改任何核心行都是方向变更，必须先写 BLOCKING 的 R-n，等 A 批准。
    - 先运行它，确认它因为预期的根因失败；再写刚好让它通过的修复。
-3. 每个步骤完成时，跑完这一步的全部测试之后、`git commit` 之前的最后一个动作是**定点读**：读 `rulings.md` 和 `batch.md` 里编号在游标之后的新条目，处理适用的条目，更新 `progress.md` 的已读游标。读到要改代码的新条目，先改，再重跑受影响的测试，然后再做一次定点读。同时确认这一步的用例已经写进「用例记录」：A 被这个 commit 唤醒后，要靠它轻检。
+3. 每个步骤完成时，跑完这一步的全部测试之后、`git commit` 之前的最后一个动作是**定点读**：读 `rulings.md`（含 `### R-<n> →` 和 A 主动写的 `### D-<n>`）和 `batch.md` 里编号在游标之后的新条目，处理适用的条目，更新 `progress.md` 的已读游标。读到要改代码的新条目，先改，再重跑受影响的测试，然后再做一次定点读。同时确认这一步的用例已经写进「用例记录」：A 被这个 commit 唤醒后，要靠它轻检。任务有中间 `[M]` 步时，在开始最后一步之前，先读 `review-state.md`：确认 `last_reviewed_sha` 已到达或越过上一个 `[M]` 步的 commit sha 且 `在途` 不是 `审查进行中`，再改最后一步的代码和交回 `DOD`；还没审完时先写不改代码的文档草稿，等审查落盘后再定点读并完成最后一步（等超过 15 分钟仍未落盘，结束本轮回 `STATUS: PAUSED 等前序 [M] 审查落盘`）。
 4. commit 前跑 `git diff --check`，有多余空行或行尾空格就先清掉。仓库文件以 CRLF 存储时改跑 `git -c core.whitespace=cr-at-eol diff --check`，否则每一行都会被报成行尾空格。commit 带 trailer，同时更新 `progress.md`。commit 要小：子步骤做完就提交，中间态用 `Flow: wip`。commit 后用 `git log --oneline -2` 核对；commit 命令看着像失败时，先看 `git log` 和 `git status --short`，确认没提交上再重做，免得同一个 commit 提交两次。
 5. 日志只写进 duo 目录的 `logs/`，不写别处。运行日志只读命中段，不整读：先用 `rg -n "FAIL|Error|Traceback" <日志>` 定位，再拿这条用例行「可观察结果」里的字面输出当关键字筛一遍。命中太多或看不懂，再按「外包」交给子 agent，给它日志路径和关键字。结论要带证据，写路径加行号或 commit sha。你自己加的诊断输出一律带前缀 `[DEBUG-duo]`，最后一步 commit 前用它搜一遍，删干净。
 6. 预计超过 2 分钟、你要停下等的事（长命令、等子 agent 交回），或预计连续只读超过 5 分钟（例如通读调用方代码），先在 duo 目录写 `running`。它只有一行：`<预计分钟> <在做什么>`。做完立即删掉。A 的监视脚本靠它区分「在跑长命令」和「卡住」；没有它，10 分钟没动静就会被判为卡住。
@@ -146,7 +146,7 @@ A resume 你的情形不止下面这些，完整清单在 A 那边，你不用�
 2. 用户确认的流程指令，例如方案升版。按指令做。方案升版时，只重做 `rulings.md` 里写明受影响的步骤。
 3. BLOCKING 答复通知：读 `rulings.md`，继续。
 4. 判你卡住时重发的最后一条指令：按 `progress.md` 和 `git log` 的现状接着做。在等后台长命令时，补写 `running`，接着等同一个 shell。
-5. DoD 撤销，包括 A 转来的 MR/PR 评审意见：修消息里点名的 `batch.md` 条目，每条单独 commit，带 `Flow: fix <发现编号>`。修完按「收尾」再回一次 `STATUS: DOD`。
+5. DoD 撤销，包括 A 转来的 MR/PR 评审意见：修消息里点名的 `batch.md` 条目，每条单独 commit，带 `Flow: fix <发现编号>`；每修完一条、commit 之前做一次定点读，全部修完重交 `STATUS: DOD` 前再做一次定点读。按「收尾」重回 `STATUS: DOD` 时，在回复里列出已修编号，以及 `batch.md` 里仍为 `open` 的条目和不修的理由。
 6. 步骤超时：这一步做得太久，用户让 A 打断你。先按第 1 种的第 1 条把半步改动 commit 成 `Flow: wip`，message 写「步骤超时打断，未完成」；再结束本轮，回复 `STATUS: PAUSED 步骤超时：<卡在哪、试过什么、还差什么>`。A 之后 resume 你时，按 `rulings.md` 里新的裁决继续。
 7. 要你停手：先按第 1 种的第 1 条把半步改动 commit 成 `Flow: wip`，message 写「被叫停，未完成」；再结束本轮，回复 `STATUS: STOPPED`。
 
@@ -185,7 +185,7 @@ A 验收的用例：<编号，没有写「无」>
 - 本批改动文件：
 - 下一步：
 - 未决项：
-- 已读游标：rulings.md 到 <最后读到的 R-n>；batch.md 到 <最后读到的编号>；handover 指令到 <I-n，只在退路里用>
+- 已读游标：rulings.md 到 <最后读到的 R-n / D-n>；batch.md 到 <最后读到的 F-n>；handover 指令到 <I-n，只在退路里用>
 
 ## 用例记录
 | 用例 | 状态 | 命令 | 输出摘要 | 日志 | commit |
@@ -200,6 +200,6 @@ A 验收的用例：<编号，没有写「无」>
 ## 压缩日志
 ```
 
-「用例记录」的行只加在这张表里。每个 `## ` 小标题单独占一行，前面空一行：A 验收时按行首的 `## ` 切出这张表。
+「用例记录」的行只加在这张表里，追加前确认文件末尾已有换行，每条用例独占一行（行内不出现 `|| ` 粘连）。每个 `## ` 小标题单独占一行，前面空一行：A 验收时按行首的 `## ` 切出这张表。
 
 「流程摩擦」可选，最多 3 条：碰到本 skill 的条文说不通，或者监视脚本、宿主工具有坑时，顺手记一行「步骤、现象、建议」，以 `- ` 开头，记完接着干活。被修项目自己的代码问题不记，没有就留空。它只是记录，要 A 裁决的事照旧写 R-n。

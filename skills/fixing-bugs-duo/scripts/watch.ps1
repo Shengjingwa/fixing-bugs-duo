@@ -22,6 +22,10 @@ if ($LASTEXITCODE -ne 0 -or -not $gitDir) {
 }
 $gitDir = "$gitDir".Trim()
 $duo = Join-Path $gitDir 'duo'
+if (-not (Test-Path -LiteralPath $duo -PathType Container)) {
+    Write-Output "DUO_ERROR_$Tag duo directory missing: $duo"
+    exit 1
+}
 $progress = Join-Path $duo 'progress.md'
 $running = Join-Path $duo 'running'
 $seq = 0
@@ -126,7 +130,7 @@ $stallReported = $false
 # new turn, for StepMinutes; repeated every StepMinutes. Ignores duo/running.
 $stepAt = $activeAt
 $slowAt = $StepMinutes
-Write-Output "DUO_READY_$Tag pid=$PID head=$head requests=$requests transcript=$([bool]$ts) duo=$duo"
+Write-Output "DUO_READY_$Tag pid=$PID head=$head requests=$requests transcript=$([bool]$ts) idle=$wasIdle duo=$duo"
 
 while ($true) {
     Start-Sleep -Seconds $PollSeconds
@@ -171,6 +175,9 @@ while ($true) {
             $tsLength = $ts.Length
             $activeAt = $now
             $stallReported = $false
+        }
+        if ($idle -and (-not $wasIdle -or $grew)) {
+            Send-Wake 'idle'
         }
         # A resume appends A's message at once, so B started a new turn when
         # the transcript grew or stopped ending in turn_ended.

@@ -105,12 +105,17 @@ wait_ready() {
 }
 
 scen_not_git() {
-  local dir="$root/not_git/dir" got code
-  mkdir -p "$dir"
+  local dir="$root/not_git/dir" no_duo="$root/not_git/no_duo" got code got2 code2
+  mkdir -p "$dir" "$no_duo"
   got=$(bash "$watch" "$dir" t 2>&1)
   code=$?
   check "error line: $got" grep -q '^DUO_ERROR_t not a git worktree' <<< "$got"
   check "exit code 1 (got $code)" [ "$code" = 1 ]
+  git -C "$no_duo" init -q
+  got2=$(bash "$watch" "$no_duo" t 2>&1)
+  code2=$?
+  check "missing duo error line: $got2" grep -q '^DUO_ERROR_t duo directory missing:' <<< "$got2"
+  check "missing duo exit code 1 (got $code2)" [ "$code2" = 1 ]
 }
 
 scen_events() {
@@ -159,6 +164,7 @@ scen_idle() {
   new_transcript idle
   start_watch DUO_STALL_MINUTES=1 DUO_HEARTBEAT_MINUTES=1 DUO_STEP_MINUTES=1
   wait_ready
+  check 'ready line reports initial idle state' grep -q ' transcript=True idle=True ' <<< "$ready"
   set_quiet
   sleep 80
   check "no wake while the transcript ends with turn_ended: $(wakes | tr '\n' ',')" [ "$(wake_count)" = 0 ]
@@ -228,11 +234,12 @@ scen_slow_turn() {
   wait_ready
   check 'slow 1 during the first turn' wait_line '^DUO_WAKE_t 1 slow 1$' 90
   echo '{"type":"turn_ended","status":"success"}' >> "$transcript"
+  check 'turn_ended wakes with idle' wait_line '^DUO_WAKE_t 2 idle$' 15
   sleep 70
-  check "no slow while B is idle: $(wakes | tr '\n' ',')" [ "$(wake_count)" = 1 ]
+  check "no slow while B is idle: $(wakes | tr '\n' ',')" [ "$(wake_count)" = 2 ]
   echo '{"role":"user","message":{"content":[{"type":"text","text":"next"}]}}' >> "$transcript"
   resumed=$(elapsed)
-  wait_line '^DUO_WAKE_t 2 slow 1$' 100 || at=-1000
+  wait_line '^DUO_WAKE_t 3 slow 1$' 100 || at=-1000
   check "a new turn restarts the timer and its minutes (slow 1 $((at - resumed))s after it): $(wakes | tr '\n' ',')" within $((at - resumed)) 55 85
 }
 
